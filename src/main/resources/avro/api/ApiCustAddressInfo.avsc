@@ -1,0 +1,18 @@
+{
+  "type": "record",
+  "name": "ApiCustAddressInfo",
+  "namespace": "com.ci.streams.avro",
+  "fields": [
+    {"name": "full_address", "type": "string"},
+    {"name": "road_address", "type": ["null", "string"], "default": null},
+    {"name": "zipcode", "type": ["null", "string"], "default": null},
+    {"name": "city", "type": ["null", "string"], "default": null},
+    {"name": "district", "type": ["null", "string"], "default": null},
+    {"name": "town", "type": ["null", "string"], "default": null},
+    {"name": "juso_quality", "type": ["null", "string"], "default": null},
+    {"name": "juso_result_count", "type": ["null", "int"], "default": null},
+    {"name": "juso_matched_keyword", "type": ["null", "string"], "default": null},
+    {"name": "__op", "type": ["null", "string"], "default": null, "doc": "C, U, R, D"},
+    {"name": "__processed_at", "type": ["null", {"type": "long", "logicalType": "timestamp-millis"}], "default": null}
+  ]
+}

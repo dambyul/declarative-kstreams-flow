@@ -1,0 +1,15 @@
+target/
+test/
+build/
+state/
+.vscode/
+*.log
+*.crt
+*.key
+*.pem
+log/
+junk/
+.settings/
+.env
+*.p12
+*.jks

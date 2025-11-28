@@ -1,0 +1,8 @@
+{
+  "type": "record",
+  "name": "SourceEvent",
+  "namespace": "com.ci.streams.avro",
+  "fields": [
+    {"name": "payload", "type": ["null", "string"], "default": null}
+  ]
+}

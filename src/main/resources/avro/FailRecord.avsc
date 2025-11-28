@@ -1,0 +1,11 @@
+{
+  "type": "record",
+  "name": "FailRecord",
+  "namespace": "com.ci.streams.avro",
+  "fields": [
+    {"name": "payload", "type": ["null", "string"], "default": null},
+    {"name": "error_context", "type": ["null", "string"], "default": null},
+    {"name": "reason", "type": ["null", "string"], "default": null},
+    {"name": "failed_at", "type": {"type": "long", "logicalType": "timestamp-millis"}}
+  ]
+}

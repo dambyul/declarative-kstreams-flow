@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "name": "SampleUnion",
+  "namespace": "com.ci.streams.avro",
+  "fields": [
+    {"name": "user_id", "type": "string"},
+    {"name": "full_name", "type": ["null", "string"], "default": null},
+    {"name": "contact_email", "type": ["null", "string"], "default": null},
+    {"name": "contact_phone", "type": ["null", "string"], "default": null},
+    {"name": "__op", "type": ["null", "string"], "default": null},
+    {"name": "__processed_at", "type": ["null", {"type": "long", "logicalType": "timestamp-millis"}], "default": null}
+  ]
+}

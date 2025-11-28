@@ -1,0 +1,54 @@
+lv1_processors:
+  common:
+    failTopic: "error.lv1"
+    primaryKeyFields: ["cust_id"]
+  pipelines:
+    - name: "Lv1SamplePipeline"
+      sourceTopic: "bronze.sample_user"
+      destinationTopic: "silver.sample_user"
+      schemaName: "SampleUser"
+      mapperName: "SampleUserMapper"
+
+api_processors:
+  common:
+    destinationTopic: "silver.address_search"
+    schemaName: "ApiCustAddressInfo"
+    mapperName: "ApiCustAddressInfo"
+    failTopic: "error.api"
+    primaryKeyFields: ["full_address"]
+    inputFields: ["cust_address"]
+  pipelines:
+    - name: "ApiSamplePipeline"
+      sourceTopic: "silver.sample_user"
+
+lv2_processors:
+  common:
+    failTopic: "error.lv2"
+    primaryKeyFields: ["channel", "cust_id"]
+    targetTemplates: ["UnionTemplate", "RedisTemplate"]
+
+  templates:
+    - name: "UnionTemplate"
+      destinationTopic: "gold.sample_union"
+      schemaName: "SampleUnion"
+      mapperName: "SampleUnionMapper"
+      pipelineNamePrefix: "Union"
+
+    - name: "RedisTemplate"
+      destinationTopic: "platinum.sample_redis"
+      schemaName: "SampleRedis"
+      mapperName: "SampleRedisMapper"
+      pipelineNamePrefix: "Redis"
+      primaryKeyFields: ["cust_phone"]
+      keyType: "String"
+      keyFormat: "{phone}"
+
+  sources:
+    - sourceTopic: "cdc_lv1.vh_event_joins"
+      channel: "SampleCH-1"
+      pipelineNameSuffix: "CH1"
+
+    - sourceTopic: "cdc_lv1.mg_mgm"
+      channel: "SampleCH-2"
+      pipelineNameSuffix: "CH2"
+      targetTemplates: ["UnionTemplate"]

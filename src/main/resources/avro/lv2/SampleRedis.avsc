@@ -1,0 +1,9 @@
+{
+  "type": "record",
+  "name": "SampleRedis",
+  "namespace": "com.ci.streams.avro",
+  "fields": [
+    {"name": "entity_id", "type": "string"},
+    {"name": "data", "type": {"type": "map", "values": "long"}}
+  ]
+}
