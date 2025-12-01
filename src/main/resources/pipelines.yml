@@ -44,11 +44,11 @@ lv2_processors:
       keyFormat: "{phone}"
 
   sources:
-    - sourceTopic: "cdc_lv1.vh_event_joins"
+    - sourceTopic: "silver.sample_user"
       channel: "SampleCH-1"
       pipelineNameSuffix: "CH1"
 
-    - sourceTopic: "cdc_lv1.mg_mgm"
+    - sourceTopic: "silver.sample_user-2"
       channel: "SampleCH-2"
       pipelineNameSuffix: "CH2"
       targetTemplates: ["UnionTemplate"]
