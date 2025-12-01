@@ -179,7 +179,7 @@
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>3.5.0</version>
                 <configuration>
-                    <finalName>gs-streams</finalName>
+                    <finalName>kstreams</finalName>
                     <createDependencyReducedPom>false</createDependencyReducedPom>
                     <transformers>
                         <transformer
