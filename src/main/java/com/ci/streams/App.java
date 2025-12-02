@@ -13,6 +13,8 @@ import com.ci.streams.pipeline.StreamTask;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -45,10 +47,14 @@ public class App {
 
   public Topology buildTopology(Properties p) {
     StreamsBuilder b = new StreamsBuilder();
-
     ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-    try (InputStream inputStream =
-        this.getClass().getClassLoader().getResourceAsStream("pipelines.yml")) {
+
+    String configFile = System.getProperty("config.file");
+    if (configFile == null || configFile.isBlank()) {
+      configFile = System.getenv("PIPELINES_CONFIG_FILE");
+    }
+
+    try (InputStream inputStream = getPipelinesInputStream(configFile)) {
       Pipelines pipelines = mapper.readValue(inputStream, Pipelines.class);
 
       if (pipelines.getLv1_processors() != null) {
@@ -69,6 +75,23 @@ public class App {
     return b.build();
   }
 
+  private InputStream getPipelinesInputStream(String configFile) throws java.io.IOException {
+    if (configFile != null && !configFile.isBlank()) {
+      if (Files.exists(Paths.get(configFile))) {
+        log.info("Loading configuration from external file: {}", configFile);
+        return Files.newInputStream(Paths.get(configFile));
+      } else {
+        log.warn("External configuration file not found at: {}. Falling back to classpath.", configFile);
+      }
+    }
+    log.info("Loading configuration from classpath: pipelines.yml");
+    InputStream is = this.getClass().getClassLoader().getResourceAsStream("pipelines.yml");
+    if (is == null) {
+        throw new java.io.FileNotFoundException("pipelines.yml not found in classpath");
+    }
+    return is;
+  }
+
   private void processGroup(
       StreamsBuilder builder,
       Properties streamsProps,
@@ -83,17 +106,13 @@ public class App {
 
     if (group.getTemplates() != null && group.getSources() != null) {
       java.util.List<String> defaultTargetTemplates = null;
-      if (group.getCommon() != null
-          && group.getCommon().get("targetTemplates") instanceof java.util.List) {
-        defaultTargetTemplates = (java.util.List<String>) group.getCommon().get("targetTemplates");
+      if (group.getCommon() != null) {
+        defaultTargetTemplates = safeGetList(group.getCommon(), "targetTemplates");
       }
 
       for (Map<String, Object> source : group.getSources()) {
-        Object targetTemplatesObj = source.get("targetTemplates");
-        java.util.List<String> targetTemplates = null;
-        if (targetTemplatesObj instanceof java.util.List) {
-          targetTemplates = (java.util.List<String>) targetTemplatesObj;
-        } else {
+        java.util.List<String> targetTemplates = safeGetList(source, "targetTemplates");
+        if (targetTemplates == null) {
           targetTemplates = defaultTargetTemplates;
         }
 
@@ -145,6 +164,20 @@ public class App {
       StreamTask task = TaskFactory.createTask(type);
       task.buildPipeline(builder, streamsProps, config);
     }
+  }
+
+  @SuppressWarnings("unchecked")
+  private java.util.List<String> safeGetList(Map<String, Object> map, String key) {
+    Object value = map.get(key);
+    if (value instanceof java.util.List) {
+      try {
+        return (java.util.List<String>) value;
+      } catch (ClassCastException e) {
+        log.warn("Failed to cast value for key '{}' to List<String>. Value: {}", key, value);
+        return null;
+      }
+    }
+    return null;
   }
 
   public void start(Topology topo, Properties p) {
