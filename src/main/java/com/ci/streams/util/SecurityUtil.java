@@ -1,53 +1,48 @@
 package com.ci.streams.util;
 
+import java.io.IOException;
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.security.PrivateKey;
 import java.util.Properties;
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
+import org.bouncycastle.openssl.PEMKeyPair;
+import org.bouncycastle.openssl.PEMParser;
+import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
+import org.bouncycastle.openssl.jcajce.JcaPKCS8Generator;
+import org.bouncycastle.util.io.pem.PemObject;
+import org.bouncycastle.util.io.pem.PemWriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class SecurityUtil {
+  private static final Logger log = LoggerFactory.getLogger(SecurityUtil.class);
+
   private SecurityUtil() {}
 
   public static void applySecurity(final Properties properties) {
-    final String jaas = Env.readEnvOrFile("SASL_JAAS_CONFIG");
-    final String truststorePath = Env.env("KAFKA_TRUSTSTORE_PATH", null);
-    final String keystorePath = Env.env("KAFKA_KEYSTORE_PATH", null);
     final String pemTrust = Env.readEnvOrFile("KAFKA_TRUSTED_CERT");
     final String pemCert = Env.readEnvOrFile("KAFKA_CLIENT_CERT");
-    final String pemKey = Env.readEnvOrFile("KAFKA_CLIENT_CERT_KEY_PKCS8");
+    final String pemKey = Env.readEnvOrFile("KAFKA_CLIENT_CERT_KEY");
 
-    if (jaas != null && !jaas.isBlank()) {
-      properties.put("security.protocol", "SASL_SSL");
-      properties.put("sasl.mechanism", "PLAIN");
-      properties.put("sasl.jaas.config", jaas);
-      properties.put("ssl.endpoint.identification.algorithm", "https");
-    } else if (Env.notBlank(truststorePath) && Env.notBlank(keystorePath)) {
-      final String truststorePass = Env.env("KAFKA_TRUSTSTORE_PASS", null);
-      final String keystorePass = Env.env("KAFKA_KEYSTORE_PASS", null);
+    if (Env.notBlank(pemTrust) && Env.notBlank(pemCert) && Env.notBlank(pemKey)) {
+      log.info("PEM configuration detected. Using Native Kafka PEM support.");
 
-      properties.put("security.protocol", "SSL");
-      properties.put("ssl.truststore.location", truststorePath);
-      properties.put("ssl.truststore.password", truststorePass);
-      properties.put("ssl.truststore.type", "JKS");
-      properties.put("ssl.keystore.location", keystorePath);
-      properties.put("ssl.keystore.password", keystorePass);
-      properties.put("ssl.keystore.type", "PKCS12");
-      properties.put("ssl.endpoint.identification.algorithm", "");
-    } else if (Env.notBlank(pemTrust) && Env.notBlank(pemCert) && Env.notBlank(pemKey)) {
       properties.put("security.protocol", "SSL");
       properties.put("ssl.truststore.type", "PEM");
       properties.put("ssl.truststore.certificates", normalizePem(pemTrust));
       properties.put("ssl.keystore.type", "PEM");
       properties.put("ssl.keystore.certificate.chain", normalizePem(pemCert));
-      properties.put("ssl.keystore.key", normalizePem(pemKey));
+      properties.put("ssl.keystore.key", ensurePkcs8(normalizePem(pemKey)));
       properties.put("ssl.endpoint.identification.algorithm", "");
     }
   }
 
   public static String securityModeSummary() {
     String result = "PLAINTEXT";
-    if (Env.notBlank(System.getenv("SASL_JAAS_CONFIG"))) {
-      result = "SASL_SSL";
-    } else if (Env.notBlank(System.getenv("KAFKA_TRUSTED_CERT"))
+    if (Env.notBlank(System.getenv("KAFKA_TRUSTED_CERT"))
         && Env.notBlank(System.getenv("KAFKA_CLIENT_CERT"))
-        && Env.notBlank(System.getenv("KAFKA_CLIENT_CERT_KEY_PKCS8"))) {
+        && Env.notBlank(System.getenv("KAFKA_CLIENT_CERT_KEY"))) {
       result = "SSL(PEM)";
     }
     return result;
@@ -57,7 +52,8 @@ public final class SecurityUtil {
     if (pem == null) {
       return null;
     }
-    String tempPem = pem.replace("\r\n", "\n");
+    String tempPem = pem.replace("\n", "\n");
+    tempPem = tempPem.replace("\r\n", "\n");
     tempPem = tempPem.replace("\r", "\n");
     tempPem = tempPem.trim();
 
@@ -65,5 +61,49 @@ public final class SecurityUtil {
       tempPem = tempPem.substring(1);
     }
     return tempPem;
+  }
+
+  private static String ensurePkcs8(String pemKey) {
+    if (pemKey == null) return null;
+
+    if (pemKey.contains("BEGIN PRIVATE KEY")) {
+      return pemKey;
+    }
+
+    try (PEMParser pemParser = new PEMParser(new StringReader(pemKey))) {
+      Object object = pemParser.readObject();
+      PrivateKeyInfo pkInfo;
+
+      if (object instanceof PEMKeyPair) {
+        PEMKeyPair pemKeyPair = (PEMKeyPair) object;
+        JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
+        PrivateKey privateKey = converter.getPrivateKey(pemKeyPair.getPrivateKeyInfo());
+        
+        StringWriter writer = new StringWriter();
+        try (PemWriter pemWriter = new PemWriter(writer)) {
+             JcaPKCS8Generator gen = new JcaPKCS8Generator(privateKey, null);
+             pemWriter.writeObject(gen.generate());
+        }
+        return writer.toString();
+
+      } else if (object instanceof PrivateKeyInfo) {
+         pkInfo = (PrivateKeyInfo) object;
+         JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
+         PrivateKey privateKey = converter.getPrivateKey(pkInfo);
+         
+         StringWriter writer = new StringWriter();
+         try (PemWriter pemWriter = new PemWriter(writer)) {
+              JcaPKCS8Generator gen = new JcaPKCS8Generator(privateKey, null);
+              pemWriter.writeObject(gen.generate());
+         }
+         return writer.toString();
+      } else {
+        log.warn("Unknown PEM object type: {}. Returning original key.", object.getClass().getName());
+        return pemKey;
+      }
+    } catch (Exception e) {
+      log.error("Failed to convert PEM key to PKCS#8. Returning original key.", e);
+      return pemKey;
+    }
   }
 }
