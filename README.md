@@ -23,11 +23,16 @@ KAFKA_URL=kafka+ssl://my-kafka-broker:9092
 SCHEMA_REGISTRY_URL=http://my-schema-registry:8081
 STATE_DIR=/tmp/kstreams-state
 
-# SSL 설정 (필요한 경우)
-KAFKA_TRUSTSTORE_PATH=/path/to/truststore.jks
-KAFKA_TRUSTSTORE_PASS=changeit
-KAFKA_KEYSTORE_PATH=/path/to/keystore.p12
-KAFKA_KEYSTORE_PASS=password
+# SSL 설정 (PEM 방식 지원 - 권장)
+# 별도의 Truststore/Keystore(JKS) 생성 없이 PEM 파일을 직접 지정할 수 있습니다.
+KAFKA_TRUSTED_CERT_FILE=/path/to/ca.crt
+KAFKA_CLIENT_CERT_FILE=/path/to/client.crt
+KAFKA_CLIENT_CERT_KEY_FILE=/path/to/client.key
+
+# 또는 컨테이너 환경 등에서 파일 생성이 어려운 경우 내용을 직접 입력:
+# KAFKA_TRUSTED_CERT=-----BEGIN CERTIFICATE-----...
+# KAFKA_CLIENT_CERT=-----BEGIN CERTIFICATE-----...
+# KAFKA_CLIENT_CERT_KEY=-----BEGIN PRIVATE KEY-----...
 ```
 
 ### 3. 빌드 및 실행
@@ -42,6 +47,9 @@ mvn clean install
 
 # 애플리케이션 실행 (fat-jar)
 java -jar target/kstreams.jar
+
+# 운영 환경 실행 (외부 설정 파일 사용)
+java -Dconfig.file=/path/to/prod_pipelines.yml -jar target/kstreams.jar
 ```
 
 ---
@@ -57,6 +65,35 @@ java -jar target/kstreams.jar
 
 ---
 
+## 주요 기능 (Key Features)
+
+### 1. 강력한 SSL 지원 (PEM Support)
+Bouncy Castle 라이브러리를 내장하여 `openssl`을 이용한 복잡한 JKS 변환 과정 없이 **PEM 형식의 인증서를 바로 사용**할 수 있습니다.
+PKCS#1 및 PKCS#8 키 형식을 모두 지원하며, 환경 변수(`_FILE` 접미사 활용)를 통해 유연하게 경로를 지정할 수 있습니다.
+
+### 2. 외부 설정 파일 지원 (External Configuration)
+애플리케이션 재빌드 없이 설정을 변경할 수 있도록 외부 설정 파일을 지원합니다.
+*   **방법 1**: Java System Property `-Dconfig.file=/path/to/pipelines.yml`
+*   **방법 2**: Environment Variable `PIPELINES_CONFIG_FILE=/path/to/pipelines.yml`
+
+### 3. 템플릿 기반 설정 (Template Config)
+`pipelines.yml`에서 반복되는 파이프라인 설정을 **Template**으로 정의하고, 여러 **Source**에서 이를 재사용할 수 있습니다.
+이를 통해 설정 파일의 길이를 줄이고 유지보수성을 높일 수 있습니다.
+
+```yaml
+lv2_processors:
+  templates:
+    - name: "UnionTemplate"
+      destinationTopic: "gold.union"
+      # ... 공통 설정 ...
+  
+  sources:
+    - sourceTopic: "topic.A"
+      targetTemplates: ["UnionTemplate"]
+```
+
+---
+
 ## 개발 가이드 (Development Guide)
 
 새로운 파이프라인을 추가하려면 다음 3단계를 따르세요.
@@ -69,151 +106,8 @@ java -jar target/kstreams.jar
 데이터를 어떻게 변환할지 정의합니다. `src/main/java/com/ci/streams/mapper/` 패키지 아래에 클래스를 생성합니다.
 보통 `RecordMapper` 인터페이스를 구현하거나, 기존의 Abstract 클래스를 상속받아 구현합니다.
 
-예시:
-```java
-public class MyCustomMapper implements RecordMapper<InputClass, OutputClass> {
-    @Override
-    public OutputClass map(InputClass input) {
-        // 변환 로직 작성
-        OutputClass output = new OutputClass();
-        output.setField(input.getField());
-        return output;
-    }
-}
-```
-
-특히 `AbstractJsonDebeziumMapper`를 상속받는 경우, 다음과 같이 `FieldMappingRule`을 사용하여 입력 JSON 데이터의 필드를 Avro 스키마의 필드에 매핑할 수 있습니다.
-
-```java
-import com.ci.streams.mapper.AbstractJsonDebeziumMapper;
-import com.ci.streams.mapper.FieldMappingRule;
-import com.ci.streams.mapper.lv1.Lv1Mapper;
-import com.fasterxml.jackson.databind.JsonNode;
-import org.apache.avro.Schema;
-
-import java.util.List;
-import java.util.Map;
-
-import static com.ci.streams.mapper.FieldMappingRule.ofJsonString;
-import static com.ci.streams.mapper.FieldMappingRule.ofJsonTimestamp;
-
-public class SampleUserMapper extends AbstractJsonDebeziumMapper implements Lv1Mapper {
-
-  private final List<FieldMappingRule<JsonNode>> MAPPING_RULES;
-
-  public SampleUserMapper(Schema schema, Map<String, Object> params) {
-    super(schema, params);
-
-    this.MAPPING_RULES =
-        List.of(
-            ofJsonString("user_id", "id"),
-            ofJsonString("user_name", "name"),
-            ofJsonString("email", "email"),
-            ofJsonTimestamp("created_at", "created_at"));
-  }
-
-  @Override
-  protected List<FieldMappingRule<JsonNode>> getMappingRules() {
-    return MAPPING_RULES;
-  }
-}
-```
-`FieldMappingRule`을 사용하여 `ofJsonString`, `ofJsonTimestamp`와 같은 헬퍼 메서드를 통해 소스 JSON 필드를 대상 Avro 필드로 매핑하는 규칙을 정의합니다. 이는 Debezium과 같은 CDC(Change Data Capture) 솔루션에서 생성된 JSON 형태의 데이터를 처리할 때 특히 유용합니다.
-
-반면, 이미 Kafka Streams 내부에서 Avro 형태로 처리된 데이터를 다시 매핑해야 할 경우 (예: Lv1 프로세스 이후의 Lv2 프로세스), `ofAvroString`, `ofAvroLong`과 같은 헬퍼 메서드를 사용하거나 커스텀 매핑 로직을 구현할 수 있습니다. 이는 입력 데이터가 JSON이 아닌 Avro 레코드일 때 유용합니다.
-
-```java
-import com.ci.streams.mapper.AbstractAvroKStreamsMapper;
-import com.ci.streams.mapper.FieldMappingRule;
-import com.ci.streams.mapper.lv2.Lv2Mapper;
-import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericRecord;
-
-import java.util.List;
-import java.util.Map;
-
-import static com.ci.streams.mapper.FieldMappingRule.ofAvroLong;
-import static com.ci.streams.mapper.FieldMappingRule.ofAvroString;
-
-public class SampleUnionMapper extends AbstractAvroKStreamsMapper implements Lv2Mapper {
-
-  private final List<FieldMappingRule<GenericRecord>> MAPPING_RULES;
-  private final String channel;
-
-  public SampleUnionMapper(Schema schema, Map<String, Object> params) {
-    super(schema, params);
-    this.channel = (String) params.get("channel"); // pipelines.yml에서 channel 파라미터 사용
-
-    this.MAPPING_RULES =
-        List.of(
-            ofAvroString("user_id", "cust_id"), // Lv1 User의 cust_id를 user_id로
-            new FieldMappingRule<>(
-                "full_name", // 대상 필드 이름
-                input -> { // 커스텀 매핑 로직
-                  Object firstNameObj = safeGet(input, "cust_first_name");
-                  Object lastNameObj = safeGet(input, "cust_last_name");
-                  String fullName = "";
-                  if (firstNameObj != null) fullName += firstNameObj.toString();
-                  if (lastNameObj != null) fullName += " " + lastNameObj.toString();
-                  return fullName.trim().isEmpty() ? null : fullName.trim();
-                }),
-            ofAvroString("contact_email", "cust_email"), // Lv1 User의 cust_email을 contact_email로
-            ofAvroString("contact_phone", "cust_phone"), // Lv1 User의 cust_phone을 contact_phone로
-            ofAvroString("__op", "__op"), // _op는 그대로 전달
-            ofAvroLong("__processed_at", "__processed_at") // _processed_at 그대로 전달
-            );
-  }
-
-  @Override
-  protected List<FieldMappingRule<GenericRecord>> getMappingRules() {
-    return MAPPING_RULES;
-  }
-}
-```
-이 예시는 `AbstractAvroKStreamsMapper`를 상속받아 `GenericRecord` 형태의 Avro 데이터를 처리하는 방법을 보여줍니다. `ofAvroString`, `ofAvroLong`과 같은 메서드로 Avro 필드 간의 직접 매핑을 정의하거나, `FieldMappingRule`에 람다 표현식을 사용하여 `full_name`처럼 여러 필드를 조합하거나 복잡한 변환 로직을 적용할 수 있습니다. `params`를 통해 `pipelines.yml`에 정의된 추가 파라미터(`channel` 등)를 Mapper 내에서 활용하는 예시도 포함되어 있습니다.
-
 ### Step 3: pipelines.yml 등록
 `src/main/resources/pipelines.yml` 파일에 새 파이프라인을 정의합니다.
-
-```yaml
-lv1_processors: # 또는 api_processors, lv2_processors
-  pipelines:
-    - name: "MyNewPipeline"           # 파이프라인 이름 (유니크해야 함)
-      sourceTopic: "source.topic.name" # 읽어올 토픽
-      destinationTopic: "dest.topic.name" # 저장할 토픽
-      schemaName: "OutputSchemaName"   # Step 1에서 만든 스키마 이름 (확장자 제외)
-      mapperName: "MyCustomMapper"     # Step 2에서 만든 Mapper 클래스 이름
-```
-
----
-
-## 고급 설정 (pipelines.yml)
-
-`pipelines.yml`은 반복되는 설정을 줄이기 위해 **Common(공통 설정)**과 **Template(템플릿)** 기능을 제공합니다.
-
-### Processor 그룹
-*   `lv1_processors`: 1차 가공 (Raw -> Bronze/Silver)
-*   `api_processors`: 외부 API 연동 등이 필요한 처리
-*   `lv2_processors`: 집계나 조인 등 심화 가공 (Silver -> Gold/Platinum)
-
-### Template 기능 (Lv2 예시)
-여러 소스 토픽을 동일한 로직으로 처리해야 할 때 유용합니다.
-
-```yaml
-lv2_processors:
-  templates:
-    - name: "UnionTemplate"
-      destinationTopic: "gold.union"
-      # ... 공통 설정 ...
-  
-  sources:
-    - sourceTopic: "topic.A"
-      targetTemplates: ["UnionTemplate"] # topic.A를 UnionTemplate 규칙으로 처리
-    - sourceTopic: "topic.B"
-      targetTemplates: ["UnionTemplate"] # topic.B도 UnionTemplate 규칙으로 처리
-```
-
-이렇게 설정하면 `topic.A`와 `topic.B` 모두 `gold.union` 토픽으로 데이터가 모이게 됩니다.
 
 ---
 
