@@ -1,4 +1,4 @@
-# Kafka Streams Template Project
+# Declarative Kafka Streams Flow
 
 본 프로젝트는 Kafka Streams 애플리케이션을 빠르고 표준화된 방식으로 개발하기 위한 템플릿입니다.
 복잡한 Topology 코드를 직접 작성하는 대신, **설정 파일(`pipelines.yml`)**과 **데이터 매핑 로직(Mapper)**만 정의하면 스트림즈 애플리케이션을 구동할 수 있도록 설계되었습니다.
