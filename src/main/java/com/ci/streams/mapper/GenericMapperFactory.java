@@ -1,6 +1,6 @@
 package com.ci.streams.mapper;
 
-import com.ci.streams.config.Params;
+import com.ci.streams.config.PipelineDefinition;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -10,6 +10,7 @@ import org.apache.avro.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** 일반 매퍼 팩토리 클래스. 매퍼 타입과 스키마 이름을 기반으로 적절한 매퍼 인스턴스를 생성합니다. */
 public class GenericMapperFactory {
 
   private static final Logger log = LoggerFactory.getLogger(GenericMapperFactory.class);
@@ -21,8 +22,9 @@ public class GenericMapperFactory {
           "lv1", "com.ci.streams.mapper.lv1.",
           "lv2", "com.ci.streams.mapper.lv2.");
 
+  /** 매퍼 생성. */
   public Optional<RecordMapper> create(
-      String mapperType, String schemaName, Schema schema, Params params) {
+      String mapperType, String schemaName, Schema schema, PipelineDefinition params) {
     String packageName = MAPPER_PACKAGES.get(mapperType);
     if (packageName == null) {
       log.error("Unknown mapper type: {}", mapperType);

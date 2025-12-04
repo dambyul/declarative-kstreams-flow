@@ -4,6 +4,7 @@ import com.ci.streams.mapper.RecordMapper;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.streams.processor.api.Record;
 
+/** 일반 레코드 프로세서. RecordMapper를 사용하여 레코드를 처리하고 결과를 반환합니다. */
 public class GenericRecordProcessor<K, V, KR, VR> implements RecordProcessor<K, V> {
   private final RecordMapper<K, V, KR, VR> mapper;
 

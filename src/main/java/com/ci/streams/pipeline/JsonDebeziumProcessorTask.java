@@ -2,41 +2,36 @@ package com.ci.streams.pipeline;
 
 import com.ci.streams.avro.FailRecord;
 import com.ci.streams.avro.SourceEvent;
-import com.ci.streams.config.Params;
-import com.ci.streams.processor.GenericProcessor;
-import com.ci.streams.util.SerdeFactory;
+import com.ci.streams.config.PipelineDefinition;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.time.Instant;
-import java.util.List;
 import java.util.Properties;
-import java.util.stream.Collectors;
-import org.apache.avro.Schema;
-import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.Produced;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class JsonDebeziumProcessorTask extends AbstractProcessorTask<String> {
+/** JSON 형식의 Debezium 이벤트를 처리하는 태스크. JSON 데이터를 파싱하여 Debezium 구조(payload, before, after)를 처리합니다. */
+public class JsonDebeziumProcessorTask extends BaseDebeziumTask<String> {
 
   private static final Logger log = LoggerFactory.getLogger(JsonDebeziumProcessorTask.class);
-  private final String processorType;
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   public JsonDebeziumProcessorTask(String processorType) {
-    this.processorType = processorType;
+    super(processorType);
   }
 
   @Override
   protected KStream<String, GenericRecord> createInitialStream(
-      StreamsBuilder builder, String sourceTopic, Params params, Properties streamsProps) {
+      StreamsBuilder builder,
+      String sourceTopic,
+      PipelineDefinition params,
+      Properties streamsProps) {
 
     return builder.stream(sourceTopic, Consumed.with(Serdes.String(), Serdes.String()))
         .mapValues(
@@ -91,70 +86,5 @@ public class JsonDebeziumProcessorTask extends AbstractProcessorTask<String> {
                     .build();
               }
             });
-  }
-
-  @Override
-  protected KStream<String, GenericRecord> processStream(
-      KStream<String, GenericRecord> stream, String taskName, Params params) {
-    final String schemaName = params.getSchemaName();
-    final String mapperName = params.getMapperName();
-    return stream.process(
-        () -> new GenericProcessor<>(this.processorType, schemaName, mapperName, params));
-  }
-
-  @Override
-  protected void finalizeAndSend(
-      KStream<String, GenericRecord> stream,
-      String taskName,
-      Params params,
-      Properties streamsProps) {
-    final String destinationTopic = params.getDestinationTopic();
-    final List<String> primaryKeyFields = params.getPrimaryKeyFields();
-
-    final Serde<GenericRecord> keySerde = SerdeFactory.createGenericAvroSerde(streamsProps, true);
-    final Serde<GenericRecord> valueSerde =
-        SerdeFactory.createGenericAvroSerde(streamsProps, false);
-
-    KStream<GenericRecord, GenericRecord> avroKeyStream =
-        stream.selectKey(
-            (key, value) -> {
-              final List<Schema.Field> keyFields =
-                  primaryKeyFields.stream()
-                      .map(
-                          fieldName -> {
-                            final Schema.Field field = value.getSchema().getField(fieldName);
-                            if (field == null) {
-                              throw new IllegalStateException(
-                                  "Primary key field '"
-                                      + fieldName
-                                      + "' not found in mapped schema.");
-                            }
-                            return new Schema.Field(fieldName, field.schema(), field.doc(), null);
-                          })
-                      .collect(Collectors.toList());
-
-              final Schema keySchema =
-                  Schema.createRecord(
-                      params.getSchemaName() + "Key", null, "com.ci.streams.avro.key", false);
-              keySchema.setFields(keyFields);
-
-              final GenericRecord keyRecord = new GenericData.Record(keySchema);
-              for (final String fieldName : primaryKeyFields) {
-                keyRecord.put(fieldName, value.get(fieldName));
-              }
-              return keyRecord;
-            });
-
-    avroKeyStream
-        .peek(
-            (k, v) -> {
-              Object op = v.getSchema().getField("__op") != null ? v.get("__op") : "N/A";
-              log.info(
-                  "[{}] Processed: Key={}, Op={} -> Dest={}", taskName, k, op, destinationTopic);
-              if (log.isDebugEnabled()) {
-                log.debug("[{}] Producing to lv1 topic: key={}, value={}", taskName, k, v);
-              }
-            })
-        .to(destinationTopic, Produced.with(keySerde, valueSerde));
   }
 }

@@ -9,6 +9,10 @@ import org.apache.kafka.connect.transforms.Transformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 삭제 시 툼스톤(Tombstone) 생성 SMT (Single Message Transform). '__op' 필드가 'd'(delete)인 경우 툼스톤 레코드를 생성하여
+ * Kafka Connect 등에서 삭제를 트리거합니다.
+ */
 public class TombstoneOnDelete<R extends ConnectRecord<R>> implements Transformation<R> {
 
   private static final Logger log = LoggerFactory.getLogger(TombstoneOnDelete.class);

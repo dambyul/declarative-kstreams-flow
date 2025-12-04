@@ -1,7 +1,7 @@
 package com.ci.streams.processor;
 
 import com.ci.streams.avro.FailRecord;
-import com.ci.streams.config.Params;
+import com.ci.streams.config.PipelineDefinition;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
@@ -13,6 +13,7 @@ import org.apache.kafka.streams.processor.api.Record;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** 일반 프로세서 클래스. Kafka Streams의 Processor 인터페이스를 구현하며, 레코드 처리를 RecordProcessor에 위임합니다. */
 public class GenericProcessor<K, V> implements Processor<K, V, K, GenericRecord> {
 
   private static final Logger log = LoggerFactory.getLogger(GenericProcessor.class);
@@ -20,10 +21,11 @@ public class GenericProcessor<K, V> implements Processor<K, V, K, GenericRecord>
   private final String type;
   private final String schemaName;
   private final String mapperName;
-  private final Params params;
+  private final PipelineDefinition params;
   private RecordProcessor<K, V> recordProcessor;
 
-  public GenericProcessor(String type, String schemaName, String mapperName, Params params) {
+  public GenericProcessor(
+      String type, String schemaName, String mapperName, PipelineDefinition params) {
     this.type = type;
     this.schemaName = schemaName;
     this.mapperName = mapperName;
@@ -33,6 +35,7 @@ public class GenericProcessor<K, V> implements Processor<K, V, K, GenericRecord>
   @Override
   public void init(ProcessorContext<K, GenericRecord> context) {
     this.context = context;
+    // 매퍼 타입 및 스키마 파일 로드
     String mapperType = type.substring(0, type.indexOf("_PROCESSOR")).toLowerCase();
     String resourceName = "avro/" + mapperType + "/" + schemaName + ".avsc";
     try (InputStream is = getClass().getClassLoader().getResourceAsStream(resourceName)) {
@@ -58,6 +61,12 @@ public class GenericProcessor<K, V> implements Processor<K, V, K, GenericRecord>
     if (recordProcessor == null) {
       throw new IllegalStateException("RecordProcessor not initialized.");
     }
+
+    if (record.value() instanceof FailRecord) {
+      context.forward(record.withValue((GenericRecord) record.value()));
+      return;
+    }
+
     try {
       GenericRecord outputRecord = recordProcessor.process(record);
       if (outputRecord != null) {

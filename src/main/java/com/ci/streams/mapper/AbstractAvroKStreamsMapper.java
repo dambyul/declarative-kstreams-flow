@@ -11,6 +11,7 @@ import org.apache.kafka.streams.processor.api.Record;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Avro KStreams 매퍼 추상 클래스. Avro 레코드를 입력받아 다른 Avro 레코드로 매핑하는 공통 로직을 제공합니다. */
 public abstract class AbstractAvroKStreamsMapper
     implements RecordMapper<GenericRecord, GenericRecord, GenericRecord, GenericRecord> {
 

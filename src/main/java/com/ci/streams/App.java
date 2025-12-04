@@ -5,7 +5,6 @@ import static com.ci.streams.util.Env.flag;
 import static com.ci.streams.util.Env.must;
 import static com.ci.streams.util.SecurityUtil.applySecurity;
 
-import com.ci.streams.config.Params;
 import com.ci.streams.config.PipelineConfig;
 import com.ci.streams.config.PipelineGroup;
 import com.ci.streams.config.Pipelines;
@@ -15,7 +14,6 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -27,6 +25,7 @@ import org.apache.kafka.streams.errors.StreamsUncaughtExceptionHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Kafka Streams 애플리케이션 메인 클래스. 설정 로드, 토폴로지 구성 및 애플리케이션 실행을 담당합니다. */
 public class App {
   private static final Logger log = LoggerFactory.getLogger(App.class);
   private KafkaStreams streaming;
@@ -36,6 +35,7 @@ public class App {
     Properties p = app.setProperties();
     Topology topo = app.buildTopology(p);
 
+    // 토폴로지 출력 (디버깅용)
     if (flag("PRINT_TOPOLOGY", false)) {
       if (log.isInfoEnabled()) {
         log.info("===== TOPOLOGY =====\n{}\n====================", topo.describe());
@@ -45,10 +45,14 @@ public class App {
     app.start(topo, p);
   }
 
+  /** 파이프라인 설정을 기반으로 Kafka Streams 토폴로지를 생성합니다. */
   public Topology buildTopology(Properties p) {
     StreamsBuilder b = new StreamsBuilder();
     ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+    mapper.configure(
+        com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
+    // 설정 파일 로드 (시스템 속성 -> 환경 변수 -> 클래스패스 순)
     String configFile = System.getProperty("config.file");
     if (configFile == null || configFile.isBlank()) {
       configFile = System.getenv("PIPELINES_CONFIG_FILE");
@@ -57,14 +61,15 @@ public class App {
     try (InputStream inputStream = getPipelinesInputStream(configFile)) {
       Pipelines pipelines = mapper.readValue(inputStream, Pipelines.class);
 
+      // 각 프로세서 그룹별로 토폴로지 구성
       if (pipelines.getLv1_processors() != null) {
-        processGroup(b, p, "LV1_PROCESSOR", pipelines.getLv1_processors(), mapper);
+        processGroup(b, p, "LV1_PROCESSOR", pipelines.getLv1_processors());
       }
       if (pipelines.getApi_processors() != null) {
-        processGroup(b, p, "API_PROCESSOR", pipelines.getApi_processors(), mapper);
+        processGroup(b, p, "API_PROCESSOR", pipelines.getApi_processors());
       }
       if (pipelines.getLv2_processors() != null) {
-        processGroup(b, p, "LV2_PROCESSOR", pipelines.getLv2_processors(), mapper);
+        processGroup(b, p, "LV2_PROCESSOR", pipelines.getLv2_processors());
       }
 
     } catch (Exception e) {
@@ -75,111 +80,110 @@ public class App {
     return b.build();
   }
 
+  /** 설정 파일 입력 스트림을 가져옵니다. */
   private InputStream getPipelinesInputStream(String configFile) throws java.io.IOException {
     if (configFile != null && !configFile.isBlank()) {
       if (Files.exists(Paths.get(configFile))) {
         log.info("Loading configuration from external file: {}", configFile);
         return Files.newInputStream(Paths.get(configFile));
       } else {
-        log.warn("External configuration file not found at: {}. Falling back to classpath.", configFile);
+        log.warn(
+            "External configuration file not found at: {}. Falling back to classpath.", configFile);
       }
     }
     log.info("Loading configuration from classpath: pipelines.yml");
     InputStream is = this.getClass().getClassLoader().getResourceAsStream("pipelines.yml");
     if (is == null) {
-        throw new java.io.FileNotFoundException("pipelines.yml not found in classpath");
+      throw new java.io.FileNotFoundException("pipelines.yml not found in classpath");
     }
     return is;
   }
 
+  /** 파이프라인 그룹을 처리하여 스트림 태스크를 생성하고 토폴로지에 추가합니다. */
   private void processGroup(
-      StreamsBuilder builder,
-      Properties streamsProps,
-      String type,
-      PipelineGroup group,
-      ObjectMapper mapper) {
+      StreamsBuilder builder, Properties streamsProps, String type, PipelineGroup group) {
 
-    java.util.List<Map<String, Object>> allPipelines = new java.util.ArrayList<>();
+    java.util.List<com.ci.streams.config.PipelineDefinition> allPipelines = new java.util.ArrayList<>();
     if (group.getPipelines() != null) {
       allPipelines.addAll(group.getPipelines());
     }
 
+    // 템플릿과 소스를 기반으로 파이프라인 정의 생성
     if (group.getTemplates() != null && group.getSources() != null) {
       java.util.List<String> defaultTargetTemplates = null;
       if (group.getCommon() != null) {
-        defaultTargetTemplates = safeGetList(group.getCommon(), "targetTemplates");
+        defaultTargetTemplates = group.getCommon().getTargetTemplates();
       }
 
-      for (Map<String, Object> source : group.getSources()) {
-        java.util.List<String> targetTemplates = safeGetList(source, "targetTemplates");
+      for (com.ci.streams.config.PipelineDefinition source : group.getSources()) {
+        java.util.List<String> targetTemplates = source.getTargetTemplates();
         if (targetTemplates == null) {
           targetTemplates = defaultTargetTemplates;
         }
 
-        for (Map<String, Object> template : group.getTemplates()) {
+        for (com.ci.streams.config.PipelineDefinition template : group.getTemplates()) {
           if (targetTemplates != null) {
-            String templateName = (String) template.get("name");
+            String templateName = template.getName();
             if (templateName == null || !targetTemplates.contains(templateName)) {
               continue;
             }
           }
 
-          Map<String, Object> generated = new HashMap<>();
-          generated.putAll(template);
-          generated.putAll(source);
+          com.ci.streams.config.PipelineDefinition generated = mergeDefinitions(template, source);
 
-          String prefix = (String) template.get("pipelineNamePrefix");
-          String suffix = (String) source.get("pipelineNameSuffix");
+          String prefix = template.getPipelineNamePrefix();
+          String suffix = source.getPipelineNameSuffix();
           if (prefix != null && suffix != null) {
-            generated.put("name", prefix + suffix);
+            generated.setName(prefix + suffix);
           }
           allPipelines.add(generated);
         }
       }
     }
 
-    Map<String, Object> commonParamsMap = group.getCommon();
-    for (Map<String, Object> pipelineMap : allPipelines) {
-      PipelineConfig config = new PipelineConfig();
-      config.setType(type);
-      config.setName((String) pipelineMap.get("name"));
+    com.ci.streams.config.PipelineDefinition commonDef = group.getCommon();
 
-      Map<String, Object> mergedParamsMap = new HashMap<>();
-      if (commonParamsMap != null) {
-        mergedParamsMap.putAll(commonParamsMap);
+    for (com.ci.streams.config.PipelineDefinition pipelineDef : allPipelines) {
+      com.ci.streams.config.PipelineDefinition mergedDef = commonDef != null ? mergeDefinitions(commonDef, pipelineDef)
+          : pipelineDef;
+
+      if (mergedDef.getName() == null) {
+        throw new RuntimeException("Pipeline name is missing in group " + type);
       }
 
-      Map<String, Object> pipelineParamsMap = new HashMap<>(pipelineMap);
-      pipelineParamsMap.remove("name");
-      pipelineParamsMap.remove("pipelineNamePrefix");
-      pipelineParamsMap.remove("pipelineNameSuffix");
-      pipelineParamsMap.remove("targetTemplates");
+      if (mergedDef.getSourceTopic() == null) {
+        throw new RuntimeException("Source topic is missing for pipeline: " + mergedDef.getName());
+      }
 
-      mergedParamsMap.putAll(pipelineParamsMap);
-      mergedParamsMap.remove("targetTemplates");
+      PipelineConfig config = new PipelineConfig();
+      config.setType(type);
+      config.setName(mergedDef.getName());
 
-      Params params = mapper.convertValue(mergedParamsMap, Params.class);
-      config.setParams(params);
+      config.setParams(mergedDef);
 
-      StreamTask task = TaskFactory.createTask(type);
+      // 태스크 생성 및 토폴로지 구성
+      StreamTask task = TaskFactory.createTask(type, config);
       task.buildPipeline(builder, streamsProps, config);
     }
   }
 
-  @SuppressWarnings("unchecked")
-  private java.util.List<String> safeGetList(Map<String, Object> map, String key) {
-    Object value = map.get(key);
-    if (value instanceof java.util.List) {
-      try {
-        return (java.util.List<String>) value;
-      } catch (ClassCastException e) {
-        log.warn("Failed to cast value for key '{}' to List<String>. Value: {}", key, value);
-        return null;
-      }
-    }
-    return null;
+  /** 두 파이프라인 정의를 병합합니다. (override가 base를 덮어씀) */
+  private com.ci.streams.config.PipelineDefinition mergeDefinitions(
+      com.ci.streams.config.PipelineDefinition base,
+      com.ci.streams.config.PipelineDefinition override) {
+
+    ObjectMapper merger = new ObjectMapper();
+    Map<String, Object> baseMap = merger.convertValue(base, Map.class);
+    Map<String, Object> overrideMap = merger.convertValue(override, Map.class);
+
+    overrideMap.values().removeIf(java.util.Objects::isNull);
+
+    baseMap.putAll(overrideMap);
+
+    return merger.convertValue(baseMap, com.ci.streams.config.PipelineDefinition.class);
   }
 
+  /** Kafka Streams 애플리케이션을 시작합니다. */
   public void start(Topology topo, Properties p) {
     streaming = new KafkaStreams(topo, p);
     streaming.setUncaughtExceptionHandler(
@@ -204,6 +208,7 @@ public class App {
     log.info("[BOOT] Started.");
   }
 
+  /** Kafka Streams 속성을 설정합니다. */
   public Properties setProperties() {
     Properties p = new Properties();
     String bs = must("KAFKA_URL").replace("kafka+ssl://", "").replace("kafka://", "");
@@ -216,7 +221,8 @@ public class App {
     p.put(StreamsConfig.NUM_STREAM_THREADS_CONFIG, env("NUM_STREAM_THREADS", "32"));
     p.put(
         StreamsConfig.DEFAULT_DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG,
-        "org.apache.kafka.streams.errors.LogAndContinueExceptionHandler");
+        com.ci.streams.util.DlqExceptionHandler.class);
+    p.put("dlq.topic.name", "error.kstreams");
     p.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
     applySecurity(p);
 

@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Properties;
 import org.apache.kafka.common.serialization.Serde;
 
+/** Serde 팩토리 클래스. Avro 및 JSON Serde 인스턴스를 생성합니다. */
 public final class SerdeFactory {
 
   private SerdeFactory() {}

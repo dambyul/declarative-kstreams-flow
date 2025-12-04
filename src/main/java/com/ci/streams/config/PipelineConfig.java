@@ -1,9 +1,10 @@
 package com.ci.streams.config;
 
+/** 파이프라인 설정 래퍼 클래스. 파이프라인의 유형, 이름 및 세부 정의를 포함합니다. */
 public class PipelineConfig {
   private String type;
   private String name;
-  private Params params;
+  private PipelineDefinition params;
 
   public String getType() {
     return type;
@@ -21,11 +22,11 @@ public class PipelineConfig {
     this.name = name;
   }
 
-  public Params getParams() {
+  public PipelineDefinition getParams() {
     return params;
   }
 
-  public void setParams(Params params) {
+  public void setParams(PipelineDefinition params) {
     this.params = params;
   }
 }

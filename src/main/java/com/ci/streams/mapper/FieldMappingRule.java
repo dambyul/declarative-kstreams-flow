@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.function.Function;
 import org.apache.avro.generic.GenericRecord;
 
+/** 필드 매핑 규칙 클래스. 입력 데이터에서 값을 추출하여 출력 레코드의 필드에 매핑하는 규칙을 정의합니다. */
 public class FieldMappingRule<T> {
 
   private final String outputFieldName;
@@ -18,6 +19,34 @@ public class FieldMappingRule<T> {
   public static FieldMappingRule<JsonNode> ofJsonString(String outputFieldName, String jsonPath) {
     return new FieldMappingRule<>(
         outputFieldName, dataNode -> dataNode.path(jsonPath).asText(null));
+  }
+
+  public static FieldMappingRule<JsonNode> ofJsonCleansedName(
+      String outputFieldName, String jsonPath) {
+    return new FieldMappingRule<>(
+        outputFieldName,
+        dataNode -> StreamUtils.funcDataCleansing("name", dataNode.path(jsonPath).asText(null)));
+  }
+
+  public static FieldMappingRule<JsonNode> ofJsonCleansedPhone(
+      String outputFieldName, String jsonPath) {
+    return new FieldMappingRule<>(
+        outputFieldName,
+        dataNode -> StreamUtils.funcDataCleansing("tel_no", dataNode.path(jsonPath).asText(null)));
+  }
+
+  public static FieldMappingRule<JsonNode> ofJsonCleansedEmail(
+      String outputFieldName, String jsonPath) {
+    return new FieldMappingRule<>(
+        outputFieldName,
+        dataNode -> StreamUtils.funcDataCleansing("email", dataNode.path(jsonPath).asText(null)));
+  }
+
+  public static FieldMappingRule<JsonNode> ofJsonCleansedAddress(
+      String outputFieldName, String jsonPath) {
+    return new FieldMappingRule<>(
+        outputFieldName,
+        dataNode -> StreamUtils.funcDataCleansing("address", dataNode.path(jsonPath).asText(null)));
   }
 
   public static FieldMappingRule<JsonNode> ofJsonTimestamp(
@@ -41,12 +70,6 @@ public class FieldMappingRule<T> {
     return new FieldMappingRule<>(
         outputFieldName,
         dataNode -> StreamUtils.parseInstant(dataNode.path(jsonPath).asText(null)));
-  }
-
-  public static FieldMappingRule<JsonNode> ofJsonNormalizedPhone(
-      String outputFieldName, String jsonPath) {
-    return new FieldMappingRule<>(
-        outputFieldName, dataNode -> StreamUtils.getNormalizedPhone(dataNode, jsonPath));
   }
 
   public static FieldMappingRule<GenericRecord> ofAvroString(

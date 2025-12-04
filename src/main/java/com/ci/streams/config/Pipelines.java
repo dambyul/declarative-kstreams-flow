@@ -1,5 +1,6 @@
 package com.ci.streams.config;
 
+/** 전체 파이프라인 설정의 최상위 클래스. LV1, API, LV2 등 각 프로세서 그룹별 설정을 포함합니다. */
 public class Pipelines {
   private PipelineGroup lv1_processors;
   private PipelineGroup api_processors;

@@ -1,6 +1,6 @@
 package com.ci.streams.pipeline;
 
-import com.ci.streams.config.Params;
+import com.ci.streams.config.PipelineDefinition;
 import com.ci.streams.processor.GenericProcessor;
 import com.ci.streams.util.SerdeFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,10 +16,13 @@ import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
+import org.apache.kafka.streams.kstream.Named;
 import org.apache.kafka.streams.kstream.Produced;
+import org.apache.kafka.streams.processor.api.ProcessorSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Avro 기반의 일반 KStreams 처리 태스크. Avro 데이터를 읽어 비즈니스 로직을 수행하고 결과를 Avro 또는 문자열 키로 전송합니다. */
 public class AvroKStreamsProcessorTask extends AbstractProcessorTask<GenericRecord> {
 
   private static final Logger LOG = LoggerFactory.getLogger(AvroKStreamsProcessorTask.class);
@@ -33,7 +36,10 @@ public class AvroKStreamsProcessorTask extends AbstractProcessorTask<GenericReco
 
   @Override
   protected KStream<GenericRecord, GenericRecord> createInitialStream(
-      StreamsBuilder builder, String sourceTopic, Params params, Properties streamsProps) {
+      StreamsBuilder builder,
+      String sourceTopic,
+      PipelineDefinition params,
+      Properties streamsProps) {
     final Serde<GenericRecord> keySerde = SerdeFactory.createGenericAvroSerde(streamsProps, true);
     final Serde<GenericRecord> valueSerde =
         SerdeFactory.createGenericAvroSerde(streamsProps, false);
@@ -43,18 +49,20 @@ public class AvroKStreamsProcessorTask extends AbstractProcessorTask<GenericReco
 
   @Override
   protected KStream<GenericRecord, GenericRecord> processStream(
-      KStream<GenericRecord, GenericRecord> stream, String taskName, Params params) {
+      KStream<GenericRecord, GenericRecord> stream, String taskName, PipelineDefinition params) {
     final String schemaName = params.getSchemaName();
     final String mapperName = params.getMapperName();
     return stream.process(
-        () -> new GenericProcessor<>(this.processorType, schemaName, mapperName, params));
+        (ProcessorSupplier<GenericRecord, GenericRecord, GenericRecord, GenericRecord>)
+            () -> new GenericProcessor<>(this.processorType, schemaName, mapperName, params),
+        Named.as("GenericProcessor-" + taskName));
   }
 
   @Override
   protected void finalizeAndSend(
       KStream<GenericRecord, GenericRecord> stream,
       String taskName,
-      Params params,
+      PipelineDefinition params,
       Properties streamsProps) {
     final String destinationTopic = params.getDestinationTopic();
     final Serde<GenericRecord> valueSerde =
@@ -79,7 +87,8 @@ public class AvroKStreamsProcessorTask extends AbstractProcessorTask<GenericReco
                 } catch (Exception e) {
                   throw new RuntimeException("Failed to serialize key to JSON", e);
                 }
-              });
+              },
+              Named.as("select-string-key-" + taskName));
 
       stringKeyStream
           .peek((key, value) -> logSuccess(taskName, key, value, destinationTopic))
@@ -116,7 +125,8 @@ public class AvroKStreamsProcessorTask extends AbstractProcessorTask<GenericReco
                   keyRecord.put(fieldName, value.get(fieldName));
                 }
                 return keyRecord;
-              });
+              },
+              Named.as("select-avro-key-" + taskName));
 
       avroKeyStream
           .peek((key, value) -> logSuccess(taskName, key, value, destinationTopic))

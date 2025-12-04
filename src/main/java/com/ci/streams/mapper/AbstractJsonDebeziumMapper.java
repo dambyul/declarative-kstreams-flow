@@ -12,6 +12,7 @@ import org.apache.kafka.streams.processor.api.Record;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** JSON Debezium 매퍼 추상 클래스. JSON 형식의 Debezium 이벤트를 Avro 레코드로 변환하는 로직을 제공합니다. */
 public abstract class AbstractJsonDebeziumMapper
     implements RecordMapper<String, SourceEvent, String, GenericRecord> {
 

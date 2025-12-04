@@ -9,6 +9,7 @@ import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
 
+/** JSON 직렬화/역직렬화 클래스 (Serde). Jackson ObjectMapper를 사용하여 JSON 데이터를 처리합니다. */
 public class JsonSerde<T> implements Serde<T> {
 
   private final ObjectMapper objectMapper = new ObjectMapper();
