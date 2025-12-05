@@ -25,6 +25,8 @@ class StreamUtilsTest {
         // Phone
         assertEquals("010-1234-5678", StreamUtils.funcDataCleansing("tel_no", "01012345678"));
         assertEquals("02-123-4567", StreamUtils.funcDataCleansing("tel_no", "021234567"));
+        assertEquals("070-1234-5678", StreamUtils.funcDataCleansing("tel_no", "07012345678"));
+        assertNull(StreamUtils.funcDataCleansing("tel_no", "0111234567"));
         assertNull(StreamUtils.funcDataCleansing("tel_no", "123"));
 
         // Name

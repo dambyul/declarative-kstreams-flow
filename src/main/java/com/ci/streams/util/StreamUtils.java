@@ -153,9 +153,8 @@ public final class StreamUtils {
         return formatPhoneNumber(rst, 2, 4);
       }
 
-      // 지역번호, 구 휴대폰, 050/070
+      // 지역번호, 050/070
       if (isLocalAreaCode(prefix3)
-          || isOldMobile(prefix3)
           || "050".equals(prefix3)
           || "070".equals(prefix3)) {
         return formatPhoneNumber(rst, 3, 3);
@@ -168,12 +167,11 @@ public final class StreamUtils {
     if (len == 11) {
       String prefix3 = rst.substring(0, 3);
 
-      // 지역번호, 010, 050/070, 구 휴대폰
+      // 지역번호, 010, 050/070
       if (isLocalAreaCode(prefix3)
           || "010".equals(prefix3)
           || "050".equals(prefix3)
-          || "070".equals(prefix3)
-          || isOldMobile(prefix3)) {
+          || "070".equals(prefix3)) {
         return formatPhoneNumber(rst, 3, 4);
       }
 
