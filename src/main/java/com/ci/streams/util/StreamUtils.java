@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Base64;
@@ -15,7 +16,7 @@ import org.slf4j.LoggerFactory;
 public final class StreamUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(StreamUtils.class);
-
+  private static final DateTimeFormatter CONTDATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
   private static final Pattern EMAIL_VALID_PATTERN = Pattern.compile(
       "^[a-zA-Z0-9._%+-]+[^.@]+@[A-Za-z0-9]+([.-]?[A-Za-z0-9]+)*\\.[A-Za-z]{2,}$",
       Pattern.CASE_INSENSITIVE);
@@ -305,8 +306,8 @@ public final class StreamUtils {
   private static String cleanseAddressForFunc(String inputValue) {
     String cleaned = inputValue;
 
-    // 탭 제거
-    cleaned = cleaned.replace("\t", "");
+    // 탭 제거 -> 공백으로 치환
+    cleaned = cleaned.replace("\t", " ");
     // NBSP 제거
     cleaned = cleaned.replace("\u00A0", "");
 
@@ -368,48 +369,51 @@ public final class StreamUtils {
     return result;
   }
 
-  /** JsonNode에서 타임스탬프 파싱 (숫자 또는 문자열). */
   public static Long parseTimestamp(final JsonNode node) {
     if (node == null || node.isNull()) {
       return null;
     }
+
     if (node.isNumber()) {
-      return node.asLong();
+      long v = node.asLong();
+      return normalizeEpochToMillis(v);
     }
+
     String text = node.asText(null);
     if (text == null || text.isEmpty()) {
       return null;
     }
+
     if (text.chars().allMatch(Character::isDigit)) {
       try {
-        return Long.parseLong(text);
+        long v = Long.parseLong(text);
+        return normalizeEpochToMillis(v);
       } catch (NumberFormatException e) {
-        return parseInstant(text);
+        return parseInstant(text); // ISO-8601 같은 문자열인 경우
       }
     }
+
     return parseInstant(text);
   }
 
-  /** 성별 코드 정제 (M/W). */
-  public static String getCleansedGender(final JsonNode dataNode, final String fieldName) {
-    final JsonNode fieldNode = dataNode.path(fieldName);
-    final String raw = fieldNode.asText(null);
+  private static Long normalizeEpochToMillis(long value) {
+    // 1) 10자리 이하: 초(s)로 간주 (예: 1739771510)
+    if (value > 0 && value < 10_000_000_000L) {
+      return value * 1000L;
+    }
 
-    if (raw == null || raw.isEmpty()) {
-      return null;
+    // 2) 13자리 근처: 밀리초(ms)라고 보고 그대로
+    // (2025년 기준 epoch ms ≒ 1,700,000,000,000 정도)
+    if (value >= 1_000_000_000_000L && value < 10_000_000_000_000L) {
+      return value; // already millis
     }
-    if ("1".equals(raw)) {
-      return "M";
+
+    // 3) 16자리 근처: 마이크로초(μs)라고 보고 /1000
+    if (value >= 10_000_000_000_000L && value < 10_000_000_000_000_000L) {
+      return value / 1000L; // micros -> millis
     }
-    if ("2".equals(raw)) {
-      return "W";
-    }
-    if ("남자".equals(raw)) {
-      return "M";
-    } else if ("여자".equals(raw)) {
-      return "W";
-    }
-    return null;
+
+    return value;
   }
 
   /** 생년월일 정제 및 유효성 검사. */
@@ -486,6 +490,23 @@ public final class StreamUtils {
     }
   }
 
+  public static Long contdateToTimestampMillis(JsonNode dataNode, String fieldName) {
+    String contdate = dataNode.path(fieldName).asText(null);
+    if (contdate == null || contdate.isBlank()) {
+      return null;
+    }
+
+    final LocalDate date;
+    try {
+      date = LocalDate.parse(contdate, CONTDATE_FORMATTER);
+    } catch (DateTimeParseException e) {
+      // 형식이 이상하면 false
+      return null;
+    }
+
+    return date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli();
+  }
+
   /** 값을 Boolean으로 변환 (Y/N, 1/0, true/false). */
   public static Boolean asBoolean(
       final JsonNode dataNode, final String fieldName, final boolean defaultValue) {
@@ -534,5 +555,76 @@ public final class StreamUtils {
     } catch (IllegalArgumentException e) {
       return "";
     }
+  }
+
+  /** 주민등록번호(RESNO)에서 성별 추출 (M/F). */
+  public static String getGenderFromResno(String resno) {
+    if (resno == null || resno.length() < 7)
+      return null;
+
+    char genderDigit;
+    if (resno.contains("-")) {
+      if (resno.length() < 8)
+        return null;
+      genderDigit = resno.charAt(7);
+    } else {
+      genderDigit = resno.charAt(6);
+    }
+
+    if ("1357".indexOf(genderDigit) >= 0)
+      return "M";
+    if ("2468".indexOf(genderDigit) >= 0)
+      return "F";
+    return null;
+  }
+
+  /** 주민등록번호(RESNO)에서 생년월일 추출 (Epoch Day). */
+  public static Integer getBirthDateEpochFromResno(String resno) {
+    if (resno == null || resno.length() < 7)
+      return null;
+
+    try {
+      char genderDigit;
+      String birthPart = resno.substring(0, 6);
+
+      if (resno.contains("-")) {
+        if (resno.length() < 8)
+          return null;
+        genderDigit = resno.charAt(7);
+      } else {
+        genderDigit = resno.charAt(6);
+      }
+
+      int century = 1900;
+      if ("3478".indexOf(genderDigit) >= 0)
+        century = 2000;
+      else if ("90".indexOf(genderDigit) >= 0)
+        century = 1800;
+
+      int year = century + Integer.parseInt(birthPart.substring(0, 2));
+      int month = Integer.parseInt(birthPart.substring(2, 4));
+      int day = Integer.parseInt(birthPart.substring(4, 6));
+
+      return (int) LocalDate.of(year, month, day).toEpochDay();
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  /**
+   * 채널 값 해석.
+   * 1. 설정된 channel 값이 있으면 우선 사용.
+   * 2. 없으면 입력 레코드의 "channel" 필드 값 사용.
+   * 3. 둘 다 없으면 null.
+   */
+  public static String resolveChannel(String configChannel, org.apache.avro.generic.GenericRecord input) {
+    if (configChannel != null) {
+      return configChannel;
+    }
+    if (input != null && input.getSchema().getField("channel") != null) {
+      Object val = input.get("channel");
+      return val != null ? val.toString() : null;
+    }
+    return null;
   }
 }

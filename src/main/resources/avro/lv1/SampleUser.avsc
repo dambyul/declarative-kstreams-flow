@@ -6,6 +6,9 @@
     {"name": "user_id", "type": "string"},
     {"name": "user_name", "type": ["null", "string"], "default": null},
     {"name": "email", "type": ["null", "string"], "default": null},
+    {"name": "phone", "type": ["null", "string"], "default": null},
+    {"name": "is_active", "type": ["null", "boolean"], "default": null},
+    {"name": "decrypted_ssn", "type": ["null", "string"], "default": null},
     {"name": "created_at", "type": ["null", {"type": "long", "logicalType": "timestamp-millis"}], "default": null},
     {"name": "__op", "type": ["null", "string"], "default": null},
     {"name": "__processed_at", "type": ["null", {"type": "long", "logicalType": "timestamp-millis"}], "default": null}
