@@ -92,6 +92,12 @@ public class FieldMappingRule<T> {
     return new FieldMappingRule<>(outputFieldName, record -> safeGetAvro(record, inputFieldName));
   }
 
+  public static FieldMappingRule<GenericRecord> ofAvroChannel(
+      String outputFieldName, String defaultChannel) {
+    return new FieldMappingRule<>(
+        outputFieldName, record -> StreamUtils.resolveChannel(defaultChannel, record));
+  }
+
   private static Object safeGetAvro(GenericRecord record, String fieldName) {
     if (record == null || record.getSchema().getField(fieldName) == null) {
       return null;

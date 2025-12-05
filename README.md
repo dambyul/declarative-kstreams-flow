@@ -107,7 +107,53 @@ PEM 인증서 파일을 사용하는 경우 (권장):
 | `keyType` | Key의 데이터 타입 (String, Avro 등) | No | LV2 | `String` |
 | `keyFormat` | Key 포맷팅 문자열 | No | LV2 | `{phone}` |
 
-## 7. 코드 품질
+## 7. 데이터 매핑 (Data Mapping)
+
+`FieldMappingRule`을 사용하여 다양한 데이터 변환 로직을 정의할 수 있습니다.
+
+### 7.1. 주요 매핑 규칙 (Mapping Rules)
+
+| 규칙 메서드 | 설명 | 예시 |
+|---|---|---|
+| `ofJsonString` | JSON 필드 값을 문자열로 매핑 | `ofJsonString("user_name", "name")` |
+| `ofJsonBoolean` | JSON 필드 값을 Boolean으로 매핑 (Y/N, 1/0 등 처리) | `ofJsonBoolean("is_active", "active_yn")` |
+| `ofJsonTimestamp` | JSON 필드 값(Epoch, ISO-8601)을 Epoch Millis로 변환 | `ofJsonTimestamp("created_at", "reg_date")` |
+| `ofJsonCleansedPhone` | 전화번호 정제 (하이픈 추가 등) | `ofJsonCleansedPhone("phone", "tel_no")` |
+| `ofJsonCleansedEmail` | 이메일 정제 (도메인 오타 수정 등) | `ofJsonCleansedEmail("email", "email_addr")` |
+| `ofJsonCleansedName` | 이름 정제 (특수문자 제거 등) | `ofJsonCleansedName("user_name", "name")` |
+| `ofJsonCleansedAddress` | 주소 정제 (탭/공백 처리) | `ofJsonCleansedAddress("addr", "address")` |
+| `ofAvroString` | Avro 레코드 필드 값을 문자열로 매핑 | `ofAvroString("cust_id", "id")` |
+| `ofAvroChannel` | 채널 값 매핑 (설정값 우선, 없으면 입력값 사용) | `ofAvroChannel("channel", this.channel)` |
+
+### 7.2. DB 복호화 (DB Decryption)
+
+`JdbcDecryptMapper`를 상속받아 DB에 저장된 암호화된 데이터를 복호화하여 매핑할 수 있습니다.
+
+**필수 설정 (.env):**
+*   `JDBC_URL`: DB 연결 URL (예: `jdbc:oracle:thin:@localhost:1521:xe`)
+*   `JDBC_USERNAME`: DB 사용자명
+*   `JDBC_PASSWORD`: DB 비밀번호
+*   `JDBC_DRIVER`: JDBC 드라이버 클래스 (기본값: `oracle.jdbc.OracleDriver`)
+
+**사용 예시:**
+```java
+// Mapper 클래스에서 JdbcDecryptMapper 상속
+public class MyMapper extends JdbcDecryptMapper {
+    // ...
+    new FieldMappingRule<>("email", null) {
+        @Override
+        public void apply(JsonNode source, GenericRecord target) {
+            String pkValue = source.path("id").asText();
+            // decryptField(DB_KEY, TABLE, COLUMN, PK_COL, PK_VAL)
+            String email = decryptField("DI", "USERS", "EMAIL", "ID", pkValue);
+            if (email != null) target.put("email", email);
+        }
+    }
+    // ...
+}
+```
+
+## 8. 코드 품질
 
 *   **Spotless**: Google Java Style 가이드를 준수합니다. (`mvn spotless:apply`)
 *   **PMD/CPD**: 정적 분석을 통해 코드 품질을 유지합니다.

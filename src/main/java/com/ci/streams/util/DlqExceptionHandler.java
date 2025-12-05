@@ -33,8 +33,8 @@ public class DlqExceptionHandler implements DeserializationExceptionHandler {
     producerProps.remove("application.id");
 
     this.producer = new KafkaProducer<>(producerProps);
-    if (log.isInfoEnabled()) {
-      log.info("DlqExceptionHandler configured with DLQ topic: {}", this.dlqTopic);
+    if (log.isDebugEnabled()) {
+      log.debug("DlqExceptionHandler configured with DLQ topic: {}", this.dlqTopic);
     }
   }
 
