@@ -36,15 +36,17 @@ class ApiCustAddressInfoTest {
   @BeforeEach
   void setUp()
       throws NoSuchFieldException, IllegalAccessException, IOException, InterruptedException {
-    inputSchema = SchemaBuilder.record("InputAddress")
-        .fields()
-        .name("cust_address")
-        .type()
-        .stringType()
-        .noDefault()
-        .endRecord();
+    inputSchema =
+        SchemaBuilder.record("InputAddress")
+            .fields()
+            .name("cust_address")
+            .type()
+            .stringType()
+            .noDefault()
+            .endRecord();
 
-    try (InputStream is = getClass().getClassLoader().getResourceAsStream("avro/api/ApiCustAddressInfo.avsc")) {
+    try (InputStream is =
+        getClass().getClassLoader().getResourceAsStream("avro/api/ApiCustAddressInfo.avsc")) {
       if (is == null) {
         throw new IOException("Avro schema file not found: avro/ApiCustAddressInfo.avsc");
       }
@@ -95,7 +97,8 @@ class ApiCustAddressInfoTest {
     GenericRecord inputRecord = new GenericData.Record(inputSchema);
     inputRecord.put("cust_address", "서울 중구 한강대로 405");
 
-    Record<String, GenericRecord> record = new Record<>("test-key", inputRecord, System.currentTimeMillis());
+    Record<String, GenericRecord> record =
+        new Record<>("test-key", inputRecord, System.currentTimeMillis());
 
     Record<String, GenericRecord> resultRecord = apiCustAddressInfo.process(record);
 
@@ -120,7 +123,8 @@ class ApiCustAddressInfoTest {
     GenericRecord inputRecord = new GenericData.Record(inputSchema);
     inputRecord.put("cust_address", "");
 
-    Record<String, GenericRecord> record = new Record<>("test-key", inputRecord, System.currentTimeMillis());
+    Record<String, GenericRecord> record =
+        new Record<>("test-key", inputRecord, System.currentTimeMillis());
 
     Record<String, GenericRecord> resultRecord = apiCustAddressInfo.process(record);
     assertNull(resultRecord);
@@ -128,7 +132,8 @@ class ApiCustAddressInfoTest {
 
   @Test
   void testProcessWithNullRecordValue() {
-    Record<String, GenericRecord> record = new Record<>("test-key", null, System.currentTimeMillis());
+    Record<String, GenericRecord> record =
+        new Record<>("test-key", null, System.currentTimeMillis());
     Record<String, GenericRecord> resultRecord = apiCustAddressInfo.process(record);
     assertNull(resultRecord);
   }

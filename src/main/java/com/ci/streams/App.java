@@ -103,7 +103,8 @@ public class App {
   private void processGroup(
       StreamsBuilder builder, Properties streamsProps, String type, PipelineGroup group) {
 
-    java.util.List<com.ci.streams.config.PipelineDefinition> allPipelines = new java.util.ArrayList<>();
+    java.util.List<com.ci.streams.config.PipelineDefinition> allPipelines =
+        new java.util.ArrayList<>();
     if (group.getPipelines() != null) {
       allPipelines.addAll(group.getPipelines());
     }
@@ -144,8 +145,8 @@ public class App {
     com.ci.streams.config.PipelineDefinition commonDef = group.getCommon();
 
     for (com.ci.streams.config.PipelineDefinition pipelineDef : allPipelines) {
-      com.ci.streams.config.PipelineDefinition mergedDef = commonDef != null ? mergeDefinitions(commonDef, pipelineDef)
-          : pipelineDef;
+      com.ci.streams.config.PipelineDefinition mergedDef =
+          commonDef != null ? mergeDefinitions(commonDef, pipelineDef) : pipelineDef;
 
       if (mergedDef.getName() == null) {
         throw new RuntimeException("Pipeline name is missing in group " + type);

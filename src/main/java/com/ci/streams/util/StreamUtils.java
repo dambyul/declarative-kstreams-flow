@@ -16,47 +16,55 @@ import org.slf4j.LoggerFactory;
 public final class StreamUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(StreamUtils.class);
-  private static final DateTimeFormatter CONTDATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
-  private static final Pattern EMAIL_VALID_PATTERN = Pattern.compile(
-      "^[a-zA-Z0-9._%+-]+[^.@]+@[A-Za-z0-9]+([.-]?[A-Za-z0-9]+)*\\.[A-Za-z]{2,}$",
-      Pattern.CASE_INSENSITIVE);
+  private static final DateTimeFormatter CONTDATE_FORMATTER =
+      DateTimeFormatter.ofPattern("yyyy/MM/dd");
+  private static final Pattern EMAIL_VALID_PATTERN =
+      Pattern.compile(
+          "^[a-zA-Z0-9._%+-]+[^.@]+@[A-Za-z0-9]+([.-]?[A-Za-z0-9]+)*\\.[A-Za-z]{2,}$",
+          Pattern.CASE_INSENSITIVE);
 
-  private static final Pattern NAVER_DOMAIN_PATTERN = Pattern.compile(
-      "@anaver\\.com$|@anver\\.com$|@aver\\.com$|@haver\\.com$|@nacer\\.com$|@nanver\\.com$|@narer\\.com$|"
-          + "@naver\\.ccm$|@naver\\.cm$|@naver\\.cmm$|@naver\\.co$|@naver\\.cocm$|@naver\\.comet$|@naver\\.comn$|"
-          + "@naver\\.con$|@naver\\.cpm$|@naver\\.cpmom$|@naver\\.dacom$|@naver\\.kr$|@naver\\.net$|@naver\\.ocm$|"
-          + "@naver\\.om$|@naver\\.rocm$|@naver\\.mail$|@naver\\.vom$|@naverc\\.com$|@navercorp\\.com$|@navet\\.com$|"
-          + "@navr\\.com$|@navre\\.com$|@navver\\.com$|@navwe\\.com$|@never\\.cdm$|@never\\.com$|@nzver\\.com$|"
-          + "@navcer\\.com$|@naverr\\.com$|@nsver\\.com$|@nver\\.com$|@nvaer\\.com$");
+  private static final Pattern NAVER_DOMAIN_PATTERN =
+      Pattern.compile(
+          "@anaver\\.com$|@anver\\.com$|@aver\\.com$|@haver\\.com$|@nacer\\.com$|@nanver\\.com$|@narer\\.com$|"
+              + "@naver\\.ccm$|@naver\\.cm$|@naver\\.cmm$|@naver\\.co$|@naver\\.cocm$|@naver\\.comet$|@naver\\.comn$|"
+              + "@naver\\.con$|@naver\\.cpm$|@naver\\.cpmom$|@naver\\.dacom$|@naver\\.kr$|@naver\\.net$|@naver\\.ocm$|"
+              + "@naver\\.om$|@naver\\.rocm$|@naver\\.mail$|@naver\\.vom$|@naverc\\.com$|@navercorp\\.com$|@navet\\.com$|"
+              + "@navr\\.com$|@navre\\.com$|@navver\\.com$|@navwe\\.com$|@never\\.cdm$|@never\\.com$|@nzver\\.com$|"
+              + "@navcer\\.com$|@naverr\\.com$|@nsver\\.com$|@nver\\.com$|@nvaer\\.com$");
 
-  private static final Pattern NATE_DOMAIN_PATTERN = Pattern.compile(
-      "@ante\\.com$|@nate\\.cim$|@nate\\.co\\.kr$|@nate\\.con$|@nate\\.conm$|@nate\\.comm$|@nate\\.net$|"
-          + "@nate\\.ocm$|@natem\\.com$|@nateon\\.com$|@natel\\.com$");
+  private static final Pattern NATE_DOMAIN_PATTERN =
+      Pattern.compile(
+          "@ante\\.com$|@nate\\.cim$|@nate\\.co\\.kr$|@nate\\.con$|@nate\\.conm$|@nate\\.comm$|@nate\\.net$|"
+              + "@nate\\.ocm$|@natem\\.com$|@nateon\\.com$|@natel\\.com$");
 
-  private static final Pattern DAUM_DOMAIN_PATTERN = Pattern.compile(
-      "@damun\\.net$|@daum\\.com$|@daum\\.met$|@daum\\.nat$|@daum\\.co\\.kr$|@daum\\.con$|@daum\\.ner$|"
-          + "@daum\\.ney$|@dauma\\.net$|@daummail\\.net$|@daun\\.net$|@duam\\.com$|@duam\\.mail$|@duam\\.net$|"
-          + "@haum\\.net$|@haun\\.net$|@deum\\.net$");
+  private static final Pattern DAUM_DOMAIN_PATTERN =
+      Pattern.compile(
+          "@damun\\.net$|@daum\\.com$|@daum\\.met$|@daum\\.nat$|@daum\\.co\\.kr$|@daum\\.con$|@daum\\.ner$|"
+              + "@daum\\.ney$|@dauma\\.net$|@daummail\\.net$|@daun\\.net$|@duam\\.com$|@duam\\.mail$|@duam\\.net$|"
+              + "@haum\\.net$|@haun\\.net$|@deum\\.net$");
 
-  private static final Pattern GMAIL_DOMAIN_PATTERN = Pattern.compile(
-      "@gail\\.com$|@gailm\\.com$|@gamail\\.com$|@gamil\\.com$|@gimai\\.com$|@gimail\\.com$|@gmai\\.com$|"
-          + "@gmai\\.net$|@gmaii\\.com$|@gmail\\.cim$|@gmail\\.cocm$|@gmail\\.co\\.kr$|@gmail\\.net$|@gmail\\.som$|"
-          + "@g-mail\\.com$|@gmaile\\.net$|@gmaill\\.com$|@gmaill\\.net$|@gmair\\.com$|@gmil\\.com$|@gmil\\.net$|"
-          + "@gnail\\.com$|@google\\.co\\.kr$|@google\\.com$|@google\\.net$|@ngmail\\.com$|@ymail\\.com$|@googie\\.com$");
+  private static final Pattern GMAIL_DOMAIN_PATTERN =
+      Pattern.compile(
+          "@gail\\.com$|@gailm\\.com$|@gamail\\.com$|@gamil\\.com$|@gimai\\.com$|@gimail\\.com$|@gmai\\.com$|"
+              + "@gmai\\.net$|@gmaii\\.com$|@gmail\\.cim$|@gmail\\.cocm$|@gmail\\.co\\.kr$|@gmail\\.net$|@gmail\\.som$|"
+              + "@g-mail\\.com$|@gmaile\\.net$|@gmaill\\.com$|@gmaill\\.net$|@gmair\\.com$|@gmil\\.com$|@gmil\\.net$|"
+              + "@gnail\\.com$|@google\\.co\\.kr$|@google\\.com$|@google\\.net$|@ngmail\\.com$|@ymail\\.com$|@googie\\.com$");
 
-  private static final Pattern HANMAIL_DOMAIN_PATTERN = Pattern.compile(
-      "@anmail\\.net$|@ghanmail\\.net$|@haamail\\.net$|@haanmail\\.net$|@hamail\\.net$|@hanmaail\\.net$|"
-          + "@hanmai\\.lnet$|@hanmai\\.net$|@hanmaii\\.net$|@hanmail\\.bnet$|@hanmail\\.co\\.kr$|@hanmail\\.com$|"
-          + "@hanmail\\.ent$|@hanmail\\.et$|@hanmail\\.lnet$|@hanmail\\.met$|@hanmail\\.nat$|@hanmail\\.ne$|"
-          + "@hanmail\\.ner$|@hanmail\\.netm$|@hanmail\\.nt$|@hanmail\\.nwt$|@hanmail\\.vet$|@hanmaill\\.net$|"
-          + "@hanmal\\.net$|@hanmali\\.net$|@hanmall\\.net$|@hanmaol\\.net$|@hanmaui\\.net$|@hanmeil\\.com$|"
-          + "@hanmeil\\.net$|@hanmet\\.net$|@hanmial\\.com$|@hanmial\\.net$|@hanmiall\\.net$|@hanmil\\.net$|"
-          + "@hanmmail\\.net$|@hanmsil\\.net$|@hannmail\\.net$|@hnamail\\.net$|@hnmail\\.net$|@nahmail\\.net$|"
-          + "@hanmaiel\\.net$|@hanmaiji\\.net$");
+  private static final Pattern HANMAIL_DOMAIN_PATTERN =
+      Pattern.compile(
+          "@anmail\\.net$|@ghanmail\\.net$|@haamail\\.net$|@haanmail\\.net$|@hamail\\.net$|@hanmaail\\.net$|"
+              + "@hanmai\\.lnet$|@hanmai\\.net$|@hanmaii\\.net$|@hanmail\\.bnet$|@hanmail\\.co\\.kr$|@hanmail\\.com$|"
+              + "@hanmail\\.ent$|@hanmail\\.et$|@hanmail\\.lnet$|@hanmail\\.met$|@hanmail\\.nat$|@hanmail\\.ne$|"
+              + "@hanmail\\.ner$|@hanmail\\.netm$|@hanmail\\.nt$|@hanmail\\.nwt$|@hanmail\\.vet$|@hanmaill\\.net$|"
+              + "@hanmal\\.net$|@hanmali\\.net$|@hanmall\\.net$|@hanmaol\\.net$|@hanmaui\\.net$|@hanmeil\\.com$|"
+              + "@hanmeil\\.net$|@hanmet\\.net$|@hanmial\\.com$|@hanmial\\.net$|@hanmiall\\.net$|@hanmil\\.net$|"
+              + "@hanmmail\\.net$|@hanmsil\\.net$|@hannmail\\.net$|@hnamail\\.net$|@hnmail\\.net$|@nahmail\\.net$|"
+              + "@hanmaiel\\.net$|@hanmaiji\\.net$");
 
-  private static final Pattern OUTLOOK_DOMAIN_PATTERN = Pattern.compile(
-      "@hotmail\\.co\\.kr$|@hotmail\\.de$|@hotmail\\.nat$|@hotmail\\.net$|@hotmaill\\.com$|@hotmaol\\.com$|"
-          + "@outlook\\.kr$|@outiook\\.com$");
+  private static final Pattern OUTLOOK_DOMAIN_PATTERN =
+      Pattern.compile(
+          "@hotmail\\.co\\.kr$|@hotmail\\.de$|@hotmail\\.nat$|@hotmail\\.net$|@hotmaill\\.com$|@hotmaol\\.com$|"
+              + "@outlook\\.kr$|@outiook\\.com$");
 
   private static final Pattern ENGLISH_PATTERN = Pattern.compile("[a-zA-Z]");
   private static final Pattern KOREAN_OR_ENGLISH_PATTERN = Pattern.compile("[a-zA-Z가-힣]");
@@ -64,21 +72,18 @@ public final class StreamUtils {
   private static final Pattern KOREAN_PATTERN = Pattern.compile("[가-힣]");
   private static final Pattern ONLY_NON_NAME_CHARS_PATTERN = Pattern.compile("^[^a-zA-Z가-힣 ]+$");
 
-  private StreamUtils() {
-  }
+  private StreamUtils() {}
 
   /**
    * 데이터 정제 (이메일, 전화번호, 이름, 주소 등).
    *
    * @param cleansingType 정제 유형 (email, tel_no, name, name1, address)
-   * @param inputValue    원본 값
+   * @param inputValue 원본 값
    * @return 정제된 값 (유효하지 않으면 null)
    */
   public static String funcDataCleansing(final String cleansingType, final String inputValue) {
-    if (cleansingType == null || cleansingType.isEmpty())
-      return null;
-    if (inputValue == null || inputValue.isEmpty())
-      return null;
+    if (cleansingType == null || cleansingType.isEmpty()) return null;
+    if (inputValue == null || inputValue.isEmpty()) return null;
 
     try {
       switch (cleansingType) {
@@ -154,9 +159,7 @@ public final class StreamUtils {
       }
 
       // 지역번호, 050/070
-      if (isLocalAreaCode(prefix3)
-          || "050".equals(prefix3)
-          || "070".equals(prefix3)) {
+      if (isLocalAreaCode(prefix3) || "050".equals(prefix3) || "070".equals(prefix3)) {
         return formatPhoneNumber(rst, 3, 3);
       }
 
@@ -334,8 +337,7 @@ public final class StreamUtils {
   public static Boolean ynToBoolean(final JsonNode dataNode, final String fieldName) {
     final JsonNode fieldNode = dataNode.path(fieldName);
     final String text = fieldNode.asText(null);
-    if (text == null || text.isEmpty())
-      return false;
+    if (text == null || text.isEmpty()) return false;
     return "Y".equalsIgnoreCase(text.trim()) || "true".equalsIgnoreCase(text.trim());
   }
 
@@ -557,47 +559,39 @@ public final class StreamUtils {
 
   /** 주민등록번호(RESNO)에서 성별 추출 (M/F). */
   public static String getGenderFromResno(String resno) {
-    if (resno == null || resno.length() < 7)
-      return null;
+    if (resno == null || resno.length() < 7) return null;
 
     char genderDigit;
     if (resno.contains("-")) {
-      if (resno.length() < 8)
-        return null;
+      if (resno.length() < 8) return null;
       genderDigit = resno.charAt(7);
     } else {
       genderDigit = resno.charAt(6);
     }
 
-    if ("1357".indexOf(genderDigit) >= 0)
-      return "M";
-    if ("2468".indexOf(genderDigit) >= 0)
-      return "F";
+    if ("1357".indexOf(genderDigit) >= 0) return "M";
+    if ("2468".indexOf(genderDigit) >= 0) return "F";
     return null;
   }
 
   /** 주민등록번호(RESNO)에서 생년월일 추출 (Epoch Day). */
   public static Integer getBirthDateEpochFromResno(String resno) {
-    if (resno == null || resno.length() < 7)
-      return null;
+    if (resno == null || resno.length() < 7) return null;
 
     try {
       char genderDigit;
       String birthPart = resno.substring(0, 6);
 
       if (resno.contains("-")) {
-        if (resno.length() < 8)
-          return null;
+        if (resno.length() < 8) return null;
         genderDigit = resno.charAt(7);
       } else {
         genderDigit = resno.charAt(6);
       }
 
       int century = 1900;
-      if ("3478".indexOf(genderDigit) >= 0)
-        century = 2000;
-      else if ("90".indexOf(genderDigit) >= 0)
-        century = 1800;
+      if ("3478".indexOf(genderDigit) >= 0) century = 2000;
+      else if ("90".indexOf(genderDigit) >= 0) century = 1800;
 
       int year = century + Integer.parseInt(birthPart.substring(0, 2));
       int month = Integer.parseInt(birthPart.substring(2, 4));
@@ -609,13 +603,9 @@ public final class StreamUtils {
     }
   }
 
-  /**
-   * 채널 값 해석.
-   * 1. 설정된 channel 값이 있으면 우선 사용.
-   * 2. 없으면 입력 레코드의 "channel" 필드 값 사용.
-   * 3. 둘 다 없으면 null.
-   */
-  public static String resolveChannel(String configChannel, org.apache.avro.generic.GenericRecord input) {
+  /** 채널 값 해석. 1. 설정된 channel 값이 있으면 우선 사용. 2. 없으면 입력 레코드의 "channel" 필드 값 사용. 3. 둘 다 없으면 null. */
+  public static String resolveChannel(
+      String configChannel, org.apache.avro.generic.GenericRecord input) {
     if (configChannel != null) {
       return configChannel;
     }

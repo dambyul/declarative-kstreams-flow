@@ -10,10 +10,7 @@ import org.apache.kafka.streams.processor.ProcessorContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * 역직렬화 예외 처리기 (DLQ 전송). 메시지 역직렬화 실패 시 해당 메시지를 DLQ(Dead Letter Queue) 토픽으로 전송하고
- * 처리를 계속합니다.
- */
+/** 역직렬화 예외 처리기 (DLQ 전송). 메시지 역직렬화 실패 시 해당 메시지를 DLQ(Dead Letter Queue) 토픽으로 전송하고 처리를 계속합니다. */
 public class DlqExceptionHandler implements DeserializationExceptionHandler {
   private static final Logger log = LoggerFactory.getLogger(DlqExceptionHandler.class);
   private KafkaProducer<byte[], byte[]> producer;
@@ -55,8 +52,8 @@ public class DlqExceptionHandler implements DeserializationExceptionHandler {
     }
 
     try {
-      ProducerRecord<byte[], byte[]> dlqRecord = new ProducerRecord<>(dlqTopic, null, record.key(), record.value(),
-          record.headers());
+      ProducerRecord<byte[], byte[]> dlqRecord =
+          new ProducerRecord<>(dlqTopic, null, record.key(), record.value(), record.headers());
 
       dlqRecord
           .headers()
