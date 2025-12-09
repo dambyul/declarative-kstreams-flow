@@ -63,7 +63,12 @@ java -Dconfig.file=/path/to/prod_pipelines.yml -jar target/kstreams.jar
 | `APPLICATION_ID` | Kafka Streams 애플리케이션 ID | `my-kstreams-app` |
 | `SCHEMA_REGISTRY_URL` | Schema Registry 주소 | `http://schema-registry:8081` |
 | `STATE_DIR` | 상태 저장소 경로 | `/tmp/kstreams-state` |
+| `STATE_DIR` | 상태 저장소 경로 | `/tmp/kstreams-state` |
 | `NUM_STREAM_THREADS` | 스트림 처리 스레드 수 | `32` |
+| `API_ENC_URL` | 암호화 API URL | `http://api-server/enc` |
+| `API_AUTH_URL` | API 인증 URL | `http://api-server/auth` |
+| `API_USERNAME` | API 사용자명 | `user` |
+| `API_PASSWORD` | API 비밀번호 | `pass` |
 
 ### 보안 설정 (SSL/PEM)
 PEM 인증서 파일을 사용하는 경우 (권장):
@@ -150,6 +155,33 @@ public class MyMapper extends JdbcDecryptMapper {
         }
     }
     // ...
+}
+```
+
+### 7.3. API 기반 암호화 (API Crypto Service)
+
+`ApiCryptoService`를 사용하여 외부 API를 통한 암호화 및 복호화를 수행할 수 있습니다.
+
+**사용 예시:**
+```java
+public class MyMapper extends JdbcDecryptMapper {
+    private final ApiCryptoService cryptoService;
+
+    public MyMapper(Schema schema, Map<String, Object> params) {
+        super(schema, params);
+        this.cryptoService = new ApiCryptoService(); // 서비스 초기화
+    }
+
+    // ... mapping rules ...
+    new FieldMappingRule<>("encrypted_name", null) {
+        @Override
+        public void apply(JsonNode source, GenericRecord target) {
+            String name = source.path("name").asText(null);
+            // 암호화 수행
+            String encrypted = cryptoService.encrypt(name); 
+            if (encrypted != null) target.put("encrypted_name", encrypted);
+        }
+    }
 }
 ```
 
