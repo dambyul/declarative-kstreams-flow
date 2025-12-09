@@ -19,198 +19,240 @@ import org.junit.jupiter.api.Test;
 
 class ApiCryptoServiceTest {
 
-  static {
-    System.setProperty("API_ENC_URL", "http://localhost/enc");
-    System.setProperty("API_AUTH_URL", "http://localhost/auth");
-    System.setProperty("API_USERNAME", "testuser");
-    System.setProperty("API_PASSWORD", "testpass");
-  }
+        static {
+                System.setProperty("API_ENC_URL", "http://localhost/enc");
+                System.setProperty("API_AUTH_URL", "http://localhost/auth");
+                System.setProperty("API_USERNAME", "testuser");
+                System.setProperty("API_PASSWORD", "testpass");
+        }
 
-  private HttpClient httpClient;
-  private ObjectMapper objectMapper;
-  private ApiTokenManager tokenManager;
-  private ApiCryptoService cryptoService;
+        private HttpClient httpClient;
+        private ObjectMapper objectMapper;
+        private ApiTokenManager tokenManager;
+        private ApiCryptoService cryptoService;
 
-  @BeforeEach
-  void setUp() {
-    httpClient = mock(HttpClient.class);
-    objectMapper = new ObjectMapper(); // Use real ObjectMapper
-    tokenManager = mock(ApiTokenManager.class);
-    cryptoService = new ApiCryptoService(httpClient, objectMapper, tokenManager);
-  }
+        private static final String TEST_TOKEN = "TOKEN";
+        private static final String AUTH_HEADER = "Authorization";
+        private static final String BEARER_PREFIX = "Bearer ";
 
-  @Test
-  void encrypt_Success() throws Exception {
-    // Arrange
-    String input = "010-1234-5678";
-    String encrypted = "ENCRYPTED_VALUE";
-    String token = "VALID_TOKEN";
-    String jsonResponse = "{\"value\": [\"" + encrypted + "\"]}";
+        @BeforeEach
+        void setUp() {
+                httpClient = mock(HttpClient.class);
+                objectMapper = new ObjectMapper(); // Use real ObjectMapper
+                tokenManager = mock(ApiTokenManager.class);
+                cryptoService = new ApiCryptoService(httpClient, objectMapper, tokenManager);
+        }
 
-    when(tokenManager.getToken()).thenReturn(token);
+        @Test
+        void encrypt_Success() throws Exception {
+                // Arrange
+                String input = "010-1234-5678";
+                String encrypted = "ENCRYPTED_VALUE";
+                String token = "VALID_TOKEN";
+                String jsonResponse = "{\"value\": [\"" + encrypted + "\"]}";
 
-    HttpResponse<String> response = mock(HttpResponse.class);
-    when(response.statusCode()).thenReturn(200);
-    when(response.body()).thenReturn(jsonResponse);
+                when(tokenManager.getToken()).thenReturn(token);
 
-    when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-        .thenReturn(response);
+                HttpResponse<String> response = mock(HttpResponse.class);
+                when(response.statusCode()).thenReturn(200);
+                when(response.body()).thenReturn(jsonResponse);
 
-    // Act
-    String result = cryptoService.encrypt(input);
+                when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                                .thenReturn(response);
 
-    // Assert
-    assertEquals(encrypted, result);
-    verify(httpClient)
-        .send(
-            argThat(
-                req -> {
-                  return req.headers()
-                      .firstValue("Authorization")
-                      .orElse("")
-                      .equals("Bearer " + token);
-                }),
-            any());
-  }
+                // Act
+                String result = cryptoService.encrypt(input);
 
-  @Test
-  void encrypt_401_Retry_Success() throws Exception {
-    // Arrange
-    String input = "010-1234-5678";
-    String encrypted = "ENCRYPTED_VALUE";
-    String token1 = "EXPIRED_TOKEN";
-    String token2 = "NEW_TOKEN";
+                // Assert
+                assertEquals(encrypted, result);
+                verify(httpClient)
+                                .send(
+                                                argThat(
+                                                                req -> {
+                                                                        return req.headers()
+                                                                                        .firstValue(AUTH_HEADER)
+                                                                                        .orElse("")
+                                                                                        .equals(BEARER_PREFIX + token);
+                                                                }),
+                                                any());
+        }
 
-    when(tokenManager.getToken()).thenReturn(token1, token2);
+        @Test
+        void encrypt_401_Retry_Success() throws Exception {
+                // Arrange
+                String input = "010-1234-5678";
+                String encrypted = "ENCRYPTED_VALUE";
+                String token1 = "EXPIRED_TOKEN";
+                String token2 = "NEW_TOKEN";
 
-    HttpResponse<String> response401 = mock(HttpResponse.class);
-    when(response401.statusCode()).thenReturn(401);
+                when(tokenManager.getToken()).thenReturn(token1, token2);
 
-    HttpResponse<String> response200 = mock(HttpResponse.class);
-    when(response200.statusCode()).thenReturn(200);
-    when(response200.body()).thenReturn("{\"value\": [\"" + encrypted + "\"]}");
+                HttpResponse<String> response401 = mock(HttpResponse.class);
+                when(response401.statusCode()).thenReturn(401);
 
-    // First call returns 401, Second call returns 200
-    when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-        .thenReturn(response401, response200);
+                HttpResponse<String> response200 = mock(HttpResponse.class);
+                when(response200.statusCode()).thenReturn(200);
+                when(response200.body()).thenReturn("{\"value\": [\"" + encrypted + "\"]}");
 
-    // Act
-    String result = cryptoService.encrypt(input);
+                // First call returns 401, Second call returns 200
+                when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                                .thenReturn(response401, response200);
 
-    // Assert
-    assertEquals(encrypted, result);
-    verify(tokenManager).forceRefresh(); // Must be called
-  }
+                // Act
+                String result = cryptoService.encrypt(input);
 
-  @Test
-  void encrypt_Failure_500() throws Exception {
-    // Arrange
-    when(tokenManager.getToken()).thenReturn("TOKEN");
+                // Assert
+                assertEquals(encrypted, result);
+                verify(tokenManager).forceRefresh(); // Must be called
+        }
 
-    HttpResponse<String> response500 = mock(HttpResponse.class);
-    when(response500.statusCode()).thenReturn(500);
-    when(response500.body()).thenReturn("Server Error");
+        @Test
+        void encrypt_Failure_500() throws Exception {
+                // Arrange
+                when(tokenManager.getToken()).thenReturn(TEST_TOKEN);
 
-    when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-        .thenReturn(response500);
+                HttpResponse<String> response500 = mock(HttpResponse.class);
+                when(response500.statusCode()).thenReturn(500);
+                when(response500.body()).thenReturn("Server Error");
 
-    // Act
-    String result = cryptoService.encrypt("test");
+                when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                                .thenReturn(response500);
 
-    // Assert
-    assertNull(result); // Should be null as exception is caught and logged
-  }
+                // Act
+                String result = cryptoService.encrypt("test");
 
-  @Test
-  void decrypt_Success() throws Exception {
-    // Arrange
-    String input = "ENCRYPTED_VALUE";
-    String decrypted = "010-1234-5678";
-    String token = "VALID_TOKEN";
-    String jsonResponse = "{\"value\": [\"" + decrypted + "\"]}";
+                // Assert
+                assertNull(result); // Should be null as exception is caught and logged
+        }
 
-    when(tokenManager.getToken()).thenReturn(token);
+        @Test
+        void decrypt_Success() throws Exception {
+                // Arrange
+                String input = "ENCRYPTED_VALUE";
+                String decrypted = "010-1234-5678";
+                String token = "VALID_TOKEN";
+                String jsonResponse = "{\"value\": [\"" + decrypted + "\"]}";
 
-    HttpResponse<String> response = mock(HttpResponse.class);
-    when(response.statusCode()).thenReturn(200);
-    when(response.body()).thenReturn(jsonResponse);
+                when(tokenManager.getToken()).thenReturn(token);
 
-    when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-        .thenReturn(response);
+                HttpResponse<String> response = mock(HttpResponse.class);
+                when(response.statusCode()).thenReturn(200);
+                when(response.body()).thenReturn(jsonResponse);
 
-    // Act
-    String result = cryptoService.decrypt(input);
+                when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                                .thenReturn(response);
 
-    // Assert
-    assertEquals(decrypted, result);
-    verify(httpClient)
-        .send(
-            argThat(
-                req -> {
-                  return req.headers()
-                      .firstValue("Authorization")
-                      .orElse("")
-                      .equals("Bearer " + token);
-                }),
-            any());
-  }
+                // Act
+                String result = cryptoService.decrypt(input);
 
-  @Test
-  void encrypt_Batch_Success() throws Exception {
-    // Arrange
-    List<String> inputs = List.of("v1", "v2");
-    String token = "VALID_TOKEN";
-    // Mock response for 2 items
-    String jsonResponse = "{\"value\": [\"e1\", \"e2\"]}";
+                // Assert
+                assertEquals(decrypted, result);
+                verify(httpClient)
+                                .send(
+                                                argThat(
+                                                                req -> {
+                                                                        return req.headers()
+                                                                                        .firstValue(AUTH_HEADER)
+                                                                                        .orElse("")
+                                                                                        .equals(BEARER_PREFIX + token);
+                                                                }),
+                                                any());
+        }
 
-    when(tokenManager.getToken()).thenReturn(token);
+        @Test
+        void encrypt_Batch_Success() throws Exception {
+                // Arrange
+                List<String> inputs = List.of("v1", "v2");
+                String token = "VALID_TOKEN";
+                // Mock response for 2 items
+                String jsonResponse = "{\"value\": [\"e1\", \"e2\"]}";
 
-    HttpResponse<String> response = mock(HttpResponse.class);
-    when(response.statusCode()).thenReturn(200);
-    when(response.body()).thenReturn(jsonResponse);
+                when(tokenManager.getToken()).thenReturn(token);
 
-    when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-        .thenReturn(response);
+                HttpResponse<String> response = mock(HttpResponse.class);
+                when(response.statusCode()).thenReturn(200);
+                when(response.body()).thenReturn(jsonResponse);
 
-    // Act
-    List<String> results = cryptoService.encrypt(inputs);
+                when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                                .thenReturn(response);
 
-    // Assert
-    assertEquals(2, results.size());
-    assertEquals("e1", results.get(0));
-    assertEquals("e2", results.get(1));
-  }
+                // Act
+                List<String> results = cryptoService.encrypt(inputs);
 
-  @Test
-  void decrypt_Batch_Success() throws Exception {
-    // Arrange
-    List<String> inputs = List.of("e1", "e2", "e3");
-    String token = "VALID_TOKEN";
-    String jsonResponse = "{\"value\": [\"v1\", \"v2\", \"v3\"]}";
+                // Assert
+                assertEquals(2, results.size());
+                assertEquals("e1", results.get(0));
+                assertEquals("e2", results.get(1));
+        }
 
-    when(tokenManager.getToken()).thenReturn(token);
+        @Test
+        void decrypt_Batch_Success() throws Exception {
+                // Arrange
+                List<String> inputs = List.of("e1", "e2", "e3");
+                String token = "VALID_TOKEN";
+                String jsonResponse = "{\"value\": [\"v1\", \"v2\", \"v3\"]}";
 
-    HttpResponse<String> response = mock(HttpResponse.class);
-    when(response.statusCode()).thenReturn(200);
-    when(response.body()).thenReturn(jsonResponse);
+                when(tokenManager.getToken()).thenReturn(token);
 
-    when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
-        .thenReturn(response);
+                HttpResponse<String> response = mock(HttpResponse.class);
+                when(response.statusCode()).thenReturn(200);
+                when(response.body()).thenReturn(jsonResponse);
 
-    // Act
-    List<String> results = cryptoService.decrypt(inputs);
+                when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                                .thenReturn(response);
 
-    // Assert
-    assertEquals(3, results.size());
-    assertEquals("v1", results.get(0));
-    assertEquals("v3", results.get(2));
-  }
+                // Act
+                List<String> results = cryptoService.decrypt(inputs);
 
-  @Test
-  void batch_EmptyInput_ReturnsEmpty() {
-    // Act
-    List<String> results = cryptoService.encrypt(List.of());
-    // Assert
-    assertTrue(results.isEmpty());
-  }
+                // Assert
+                assertEquals(3, results.size());
+                assertEquals("v1", results.get(0));
+                assertEquals("v3", results.get(2));
+        }
+
+        @Test
+        void encrypt_Failure_MissingValue() throws Exception {
+                // Arrange
+                when(tokenManager.getToken()).thenReturn(TEST_TOKEN);
+
+                HttpResponse<String> response = mock(HttpResponse.class);
+                when(response.statusCode()).thenReturn(200);
+                when(response.body()).thenReturn("{\"result\": true}"); // Missing "value"
+
+                when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                                .thenReturn(response);
+
+                // Act
+                List<String> results = cryptoService.encrypt(List.of("test"));
+
+                // Assert
+                assertTrue(results.isEmpty()); // Exception caught, returns empty list
+        }
+
+        @Test
+        void encrypt_Failure_ResultFalse() throws Exception {
+                // Arrange
+                when(tokenManager.getToken()).thenReturn(TEST_TOKEN);
+
+                HttpResponse<String> response = mock(HttpResponse.class);
+                when(response.statusCode()).thenReturn(200);
+                when(response.body()).thenReturn("{\"result\": false, \"err\": \"Invalid Item\"}");
+
+                when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                                .thenReturn(response);
+
+                // Act
+                List<String> results = cryptoService.encrypt(List.of("test"));
+
+                // Assert
+                assertTrue(results.isEmpty()); // Exception caught, returns empty list
+        }
+
+        @Test
+        void batch_EmptyInput_ReturnsEmpty() {
+                // Act
+                List<String> results = cryptoService.encrypt(List.of());
+                // Assert
+                assertTrue(results.isEmpty());
+        }
 }

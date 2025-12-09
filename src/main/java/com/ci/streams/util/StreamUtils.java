@@ -15,23 +15,21 @@ import org.slf4j.LoggerFactory;
 public final class StreamUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(StreamUtils.class);
-  private static final DateTimeFormatter CONTDATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+  private static final DateTimeFormatter CONTDATE_FORMATTER =
+      DateTimeFormatter.ofPattern("yyyy/MM/dd");
 
-  private StreamUtils() {
-  }
+  private StreamUtils() {}
 
   /**
    * 데이터 정제 (이메일, 전화번호, 이름, 주소 등).
    *
    * @param cleansingType 정제 유형 (email, tel_no, name, name1, address)
-   * @param inputValue    원본 값
+   * @param inputValue 원본 값
    * @return 정제된 값 (유효하지 않으면 null)
    */
   public static String funcDataCleansing(final String cleansingType, final String inputValue) {
-    if (cleansingType == null || cleansingType.isEmpty())
-      return null;
-    if (inputValue == null || inputValue.isEmpty())
-      return null;
+    if (cleansingType == null || cleansingType.isEmpty()) return null;
+    if (inputValue == null || inputValue.isEmpty()) return null;
 
     try {
       switch (cleansingType) {
@@ -265,8 +263,7 @@ public final class StreamUtils {
   public static Boolean ynToBoolean(final JsonNode dataNode, final String fieldName) {
     final JsonNode fieldNode = dataNode.path(fieldName);
     final String text = fieldNode.asText(null);
-    if (text == null || text.isEmpty())
-      return false;
+    if (text == null || text.isEmpty()) return false;
     return "Y".equalsIgnoreCase(text.trim()) || "true".equalsIgnoreCase(text.trim());
   }
 
@@ -488,47 +485,39 @@ public final class StreamUtils {
 
   /** 주민등록번호(RESNO)에서 성별 추출 (M/F). */
   public static String getGenderFromResno(String resno) {
-    if (resno == null || resno.length() < 7)
-      return null;
+    if (resno == null || resno.length() < 7) return null;
 
     char genderDigit;
     if (resno.contains("-")) {
-      if (resno.length() < 8)
-        return null;
+      if (resno.length() < 8) return null;
       genderDigit = resno.charAt(7);
     } else {
       genderDigit = resno.charAt(6);
     }
 
-    if ("1357".indexOf(genderDigit) >= 0)
-      return "M";
-    if ("2468".indexOf(genderDigit) >= 0)
-      return "F";
+    if ("1357".indexOf(genderDigit) >= 0) return "M";
+    if ("2468".indexOf(genderDigit) >= 0) return "F";
     return null;
   }
 
   /** 주민등록번호(RESNO)에서 생년월일 추출 (Epoch Day). */
   public static Integer getBirthDateEpochFromResno(String resno) {
-    if (resno == null || resno.length() < 7)
-      return null;
+    if (resno == null || resno.length() < 7) return null;
 
     try {
       char genderDigit;
       String birthPart = resno.substring(0, 6);
 
       if (resno.contains("-")) {
-        if (resno.length() < 8)
-          return null;
+        if (resno.length() < 8) return null;
         genderDigit = resno.charAt(7);
       } else {
         genderDigit = resno.charAt(6);
       }
 
       int century = 1900;
-      if ("3478".indexOf(genderDigit) >= 0)
-        century = 2000;
-      else if ("90".indexOf(genderDigit) >= 0)
-        century = 1800;
+      if ("3478".indexOf(genderDigit) >= 0) century = 2000;
+      else if ("90".indexOf(genderDigit) >= 0) century = 1800;
 
       int year = century + Integer.parseInt(birthPart.substring(0, 2));
       int month = Integer.parseInt(birthPart.substring(2, 4));
@@ -540,10 +529,7 @@ public final class StreamUtils {
     }
   }
 
-  /**
-   * 채널 값 해석. 1. 설정된 channel 값이 있으면 우선 사용. 2. 없으면 입력 레코드의 "channel" 필드 값 사용. 3. 둘
-   * 다 없으면 null.
-   */
+  /** 채널 값 해석. 1. 설정된 channel 값이 있으면 우선 사용. 2. 없으면 입력 레코드의 "channel" 필드 값 사용. 3. 둘 다 없으면 null. */
   public static String resolveChannel(
       String configChannel, org.apache.avro.generic.GenericRecord input) {
     if (configChannel != null) {
