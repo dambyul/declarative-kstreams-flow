@@ -6,6 +6,8 @@ import io.github.cdimascio.dotenv.Dotenv;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.avro.Schema;
@@ -56,20 +58,20 @@ public abstract class JdbcDecryptMapper extends AbstractJsonDebeziumMapper {
 
   protected String decryptField(
       String dbKey, String tableName, String targetCol, String pkCol, String pkValue) {
-    return decryptField(dbKey, tableName, targetCol, java.util.Map.of(pkCol, pkValue));
+    return decryptField(dbKey, tableName, targetCol, Map.of(pkCol, pkValue));
   }
 
   protected String decryptField(
-      String dbKey, String tableName, String targetCol, java.util.Map<String, String> pkMap) {
+      String dbKey, String tableName, String targetCol, Map<String, String> pkMap) {
     HikariDataSource ds = dataSources.get(dbKey);
     if (ds == null) return null;
     if (pkMap == null || pkMap.isEmpty()) return null;
 
     StringBuilder whereClause = new StringBuilder();
-    java.util.List<Object> params = new java.util.ArrayList<>();
+    List<Object> params = new ArrayList<>();
 
     int i = 0;
-    for (java.util.Map.Entry<String, String> entry : pkMap.entrySet()) {
+    for (Map.Entry<String, String> entry : pkMap.entrySet()) {
       if (i > 0) whereClause.append(" AND ");
       whereClause.append(entry.getKey()).append(" = ?");
       params.add(entry.getValue());
